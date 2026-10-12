@@ -11,7 +11,7 @@ editor_options:
 knitr::opts_chunk$set(cache = TRUE, message=FALSE, warning=FALSE, eval=TRUE, echo=FALSE)
 ```
 
-```{r message=FALSE, warning=FALSE}
+```{r warning=FALSE}
 library(tidyr)
 library(dplyr)
 ```
@@ -23,7 +23,7 @@ the variable `key` for the gathered columns and variable `cases` for the
 values. Notice there are a lot of missing values in the current
 representation, so use `values_drop_na` to remove them.
 
-```{r eval=FALSE, echo=TRUE}
+```{r echo=TRUE}
 who1 <- who |>
   pivot_longer(new_sp_m014:newrel_f65, names_to = 'key', values_to = 'cases', values_drop_na = TRUE)
 who1
@@ -37,7 +37,7 @@ unfortunately the names are slightly inconsistent because instead of
 characters "newrel" with "new_rel" in the `key` column. This makes all
 variable names consistent.
 
-```{r eval=FALSE, echo=TRUE}
+```{r echo=TRUE}
 who2 <- who1 |> 
   mutate(key = stringr::str_replace(key, 'newrel_*', 'new_rel_'))
 who2
@@ -49,17 +49,16 @@ Separate the values in each code with three passes of `separate()`.
 First, separate key after underscore character in three new variables:
 `new`, `type`, and `sexage`
 
-```{r eval=FALSE, echo=TRUE}
+```{r echo=TRUE}
 who3 <- who2 |>
   separate(key, into = c('new', 'type', 'sexage'), sep = "_")
-
 who3
 ```
 
 Next separate `sexage` into `sex` and `age` by splitting after the first
 character:
 
-```{r eval=FALSE, echo=TRUE}
+```{r echo=TRUE}
 who4 <- who3 |>
 separate(sexage, into = c('sex', 'age'), sep = c(1))
 who4
@@ -69,12 +68,11 @@ Finally separate `age` into `age_low` and `age_high` by splitting after
 the second character (first replace "014" with "0014" and "65" with
 "65100"):
 
-```{r eval=FALSE, echo=TRUE}
+```{r echo=TRUE}
 who5 <- who4 |>
   mutate(age = stringr::str_replace(age, '014', '0014')) |>
-  mutate(age = stringr::str_replace(age, '65', '65100')) %>%
+  mutate(age = stringr::str_replace(age, '65', '65100')) |>
   separate(age, into = c('age_low', 'age_high'), sep = c(2))
-
 who5
 ```
 
@@ -83,7 +81,7 @@ who5
 Check that the `new` column is constant in this dataset. Hence drop
 column `new` as well as `iso2` and `iso3` since they're redundant.
 
-```{r eval=FALSE, echo=TRUE}
+```{r echo=TRUE}
 # check that new is constant
 who5 |> 
   select(country, new) |>
@@ -99,3 +97,16 @@ who6
 
 You have written the code a piece at a time, assigning each interim
 result to a new variable. Instead, gradually build up a complex pipe.
+
+```{r echo=TRUE}
+who |>
+  pivot_longer(new_sp_m014:newrel_f65, names_to = 'key', values_to = 'cases', values_drop_na = TRUE) |>
+  mutate(key = stringr::str_replace(key, 'newrel_*', 'new_rel_')) |>
+  separate(key, into = c('new', 'type', 'sexage'), sep = "_") |>
+  separate(sexage, into = c('sex', 'age'), sep = c(1)) |>
+  mutate(age = stringr::str_replace(age, '014', '0014')) |>
+  mutate(age = stringr::str_replace(age, '65', '65100')) |>
+  separate(age, into = c('age_low', 'age_high'), sep = c(2)) |>
+  select(-new, -iso2, -iso3)
+```
+
