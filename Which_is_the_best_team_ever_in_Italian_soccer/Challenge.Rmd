@@ -7,17 +7,20 @@ editor_options:
 
 ```{r setup, include=FALSE}
 # cache results
-knitr::opts_chunk$set(cache=FALSE, echo = TRUE, eval = FALSE, message=FALSE, warning = FALSE, fig.align='center')
+knitr::opts_chunk$set(cache=FALSE, echo = TRUE, eval = TRUE, message=FALSE, warning = FALSE, fig.align='center')
+library(dplyr)
+library(purrr)
+library(stringr)
 ```
 This challenge explores all matches of Italian soccer Serie A league from 1993 to current year. The dataset is contained in the website [football-data.co.uk](http://www.football-data.co.uk/italym.php). 
 
 ### Challenges
 1. Think about how to scrape the data from the website, but write no code at this stage.
-1. Ask AI to write code to import data by scraping the website. Select only columns Date, HomeTeam, AwayTeam, FTHG (home team goals), FTAG (away team goals)  and filter rows with a valid (not NA) Date. 
-1. Using dplyr and tidyr packages (no for loops!), compute statistics for every team (matches, wins, loses, draws, points, points per match). Hint: mutate a column with the outcome of the match (for instance, H = home teams wins, A = away team wins, P = draw). Then group by team and outcome (home and away) and hence spread the outcome. Do this step without the use of AI.
-1. Come up with at least 3 data questions on the data at hand. Just write the questions, do not find the answers.
+2. Ask AI to write code to import data by scraping the website. Select only columns Date, HomeTeam, AwayTeam, FTHG (home team goals), FTAG (away team goals)  and filter rows with a valid (not NA) Date. 
+3. Using dplyr and tidyr packages (no for loops!), compute statistics for every team (matches, wins, loses, draws, points, points per match). Hint: mutate a column with the outcome of the match (for instance, H = home teams wins, A = away team wins, P = draw). Then group by team and outcome (home and away) and hence spread the outcome. Do this step without the use of AI.
+4. Come up with at least 3 data questions on the data at hand. Just write the questions, do not find the answers.
 
-# Our scrape 
+# Our initial idea 
 
 We've seen that all the CSVs we're interested in have a common structure ("cccnnn"/"nnnn"/I1.csv). Hence we thought about scanning the webpage using a regex selecting the file names. Then we could join the names to the site link and read the files directly with read_csv(url()) and finally joining the dataframes, filtering for the requested columns.
 
@@ -38,10 +41,45 @@ df2_f = df2 |>
 
 df_full = full_join(df_f, df2_f)
   
-df_full
+head(df_full, n = 10L)
 ```
+
+### Review of the initial approach
+The initial approach correctly identifies the repeating URL pattern and the need to scrape the page dynamically rather than hardcoding seasons. Early column pruning is also effective for memory efficiency. However, scaling across all seasons requires replacing manual variable declarations with loop-free functional mapping, and replacing `full_join()` (a horizontal relational merge) with vertical row stacking (`list_rbind()` / `bind_rows()`).
 
 # AI scrape
 
-ß
+```{r}
+library(dplyr)
+library(purrr)
+library(stringr)
 
+base_url  <- "https://football-data.co.uk/"
+index_url <- "https://football-data.co.uk/italym.php"
+
+# Scrape all relative Serie A CSV links from the webpage
+links <- readLines(index_url, warn = FALSE) |>
+  stringr::str_extract("mmz4281/\\d{4}/I1\\.csv") |>
+  na.omit() |>
+  unique()
+
+# Construct absolute URLs
+full_urls <- paste0(base_url, links)
+
+# Import data: select requested columns and filter valid Date
+serie_a_matches <- full_urls |>
+  purrr::map(\(url) {
+    read.csv(url, stringsAsFactors = FALSE, na.strings = c("", "NA", " ")) |>
+      dplyr::select(Date, HomeTeam, AwayTeam, FTHG, FTAG) |>
+      dplyr::filter(!is.na(Date))
+  }) |>
+  purrr::list_rbind()
+
+head(serie_a_matches, n = 10L)
+```
+
+### Implementation choices
+1. **Dynamic scraping (`readLines` + `str_extract`)**: Scrapes `italym.php` for `mmz4281/\d{4}/I1\.csv`, automatically capturing all historical and newly added seasons without hardcoding dates.
+2. **Defensive NA handling (`na.strings = c("", "NA", " ")`)**: Historical files (e.g. 1993/94) have trailing blank lines where `Date` is `""`. Declaring these as `NA` allows `filter(!is.na(Date))` to cleanly drop them.
+3. **Early column pruning (`select(...)`)**: Modern seasons contain 100+ betting odds columns. Selecting only the 5 required columns inside the reader avoids wasting RAM across 34 seasons.
+4. **Functional iteration without loops (`purrr::map` + `purrr::list_rbind`)**: Iterates through all 34 endpoints and vertically stacks rows into a single 11,786-row dataframe without using forbidden `for` loops.
