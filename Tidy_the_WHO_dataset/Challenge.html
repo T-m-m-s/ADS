@@ -610,12 +610,12 @@ compare both pipelines using <code>microbenchmark</code>:</p>
 
 bench_results</code></pre>
 <pre><code>## Unit: milliseconds
-##                 expr      min        lq     mean   median        uq       max
-##  sequential_separate 923.3585 1007.1344 1225.407 1046.171 1525.4631 1624.9096
-##       ai_regex_pivot 101.0204  115.8772  159.063  145.937  215.6251  216.8555
-##  neval
-##      5
-##      5</code></pre>
+##                 expr       min        lq      mean    median        uq
+##  sequential_separate 255.36424 268.08297 283.21374 279.25891 290.90521
+##       ai_regex_pivot  24.21091  25.49154  26.04968  25.56535  26.72101
+##        max neval
+##  322.45737     5
+##   28.25958     5</code></pre>
 </div>
 <div id="explanation-of-ai-optimizations" class="section level4">
 <h4>Explanation of AI Optimizations</h4>
