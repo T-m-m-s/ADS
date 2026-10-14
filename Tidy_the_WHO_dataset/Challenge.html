@@ -353,6 +353,9 @@ display: none;
 </div>
 
 
+<pre class="r"><code>library(tidyr)
+library(dplyr)
+library(microbenchmark)</code></pre>
 <div id="step-1-gather" class="section level3">
 <h3>Step 1: gather</h3>
 <p>Gather together all the columns from <code>new_sp_m014</code> to
@@ -387,7 +390,7 @@ unfortunately the names are slightly inconsistent because instead of
 with “new_rel” in the <code>key</code> column. This makes all variable
 names consistent.</p>
 <pre class="r"><code>who2 &lt;- who1 |&gt; 
-  mutate(key = stringr::str_replace(key, &#39;newrel_*&#39;, &#39;new_rel_&#39;))
+  mutate(key = stringr::str_replace(key, &quot;newrel&quot;, &quot;new_rel&quot;))
 who2</code></pre>
 <pre><code>## # A tibble: 76,046 × 6
 ##    country     iso2  iso3   year key          cases
@@ -430,7 +433,7 @@ who3</code></pre>
 <p>Next separate <code>sexage</code> into <code>sex</code> and
 <code>age</code> by splitting after the first character:</p>
 <pre class="r"><code>who4 &lt;- who3 |&gt;
-separate(sexage, into = c(&#39;sex&#39;, &#39;age&#39;), sep = c(1))
+  separate(sexage, into = c(&#39;sex&#39;, &#39;age&#39;), sep = 1)
 who4</code></pre>
 <pre><code>## # A tibble: 76,046 × 9
 ##    country     iso2  iso3   year new   type  sex   age   cases
@@ -452,7 +455,7 @@ replace “014” with “0014” and “65” with “65100”):</p>
 <pre class="r"><code>who5 &lt;- who4 |&gt;
   mutate(age = stringr::str_replace(age, &#39;014&#39;, &#39;0014&#39;)) |&gt;
   mutate(age = stringr::str_replace(age, &#39;65&#39;, &#39;65100&#39;)) |&gt;
-  separate(age, into = c(&#39;age_low&#39;, &#39;age_high&#39;), sep = c(2))
+  separate(age, into = c(&#39;age_low&#39;, &#39;age_high&#39;), sep = 2)
 who5</code></pre>
 <pre><code>## # A tibble: 76,046 × 10
 ##    country     iso2  iso3   year new   type  sex   age_low age_high cases
@@ -476,10 +479,11 @@ Hence drop column <code>new</code> as well as <code>iso2</code> and
 <code>iso3</code> since they’re redundant.</p>
 <pre class="r"><code># check that new is constant
 who5 |&gt; 
-  select(country, new) |&gt;
-  filter(new != &quot;new&quot;)</code></pre>
-<pre><code>## # A tibble: 0 × 2
-## # ℹ 2 variables: country &lt;chr&gt;, new &lt;chr&gt;</code></pre>
+  count(new)</code></pre>
+<pre><code>## # A tibble: 1 × 2
+##   new       n
+##   &lt;chr&gt; &lt;int&gt;
+## 1 new   76046</code></pre>
 <pre class="r"><code># drop redundant columns
 who6 &lt;- who5 |&gt; 
   select(-new, -iso2, -iso3)
@@ -506,12 +510,12 @@ result to a new variable. Instead, gradually build up a complex
 pipe.</p>
 <pre class="r"><code>who |&gt;
   pivot_longer(new_sp_m014:newrel_f65, names_to = &#39;key&#39;, values_to = &#39;cases&#39;, values_drop_na = TRUE) |&gt;
-  mutate(key = stringr::str_replace(key, &#39;newrel_*&#39;, &#39;new_rel_&#39;)) |&gt;
+  mutate(key = stringr::str_replace(key, &quot;newrel&quot;, &quot;new_rel&quot;)) |&gt;
   separate(key, into = c(&#39;new&#39;, &#39;type&#39;, &#39;sexage&#39;), sep = &quot;_&quot;) |&gt;
-  separate(sexage, into = c(&#39;sex&#39;, &#39;age&#39;), sep = c(1)) |&gt;
+  separate(sexage, into = c(&#39;sex&#39;, &#39;age&#39;), sep = 1) |&gt;
   mutate(age = stringr::str_replace(age, &#39;014&#39;, &#39;0014&#39;)) |&gt;
   mutate(age = stringr::str_replace(age, &#39;65&#39;, &#39;65100&#39;)) |&gt;
-  separate(age, into = c(&#39;age_low&#39;, &#39;age_high&#39;), sep = c(2)) |&gt;
+  separate(age, into = c(&#39;age_low&#39;, &#39;age_high&#39;), sep = 2) |&gt;
   select(-new, -iso2, -iso3)</code></pre>
 <pre><code>## # A tibble: 76,046 × 7
 ##    country      year type  sex   age_low age_high cases
@@ -527,6 +531,150 @@ pipe.</p>
 ##  9 Afghanistan  1997 sp    f     15      24          38
 ## 10 Afghanistan  1997 sp    f     25      34          36
 ## # ℹ 76,036 more rows</code></pre>
+</div>
+<div id="ai-augmentation-critical-comparison" class="section level3">
+<h3>AI Augmentation &amp; Critical Comparison</h3>
+<blockquote>
+<p><strong>AI Contribution Disclosure</strong>: During the AI
+consultation step, we queried an LLM for code review and optimization.
+The model suggested bypassing the manual string cleaning and
+intermediate <code>separate()</code> calls by using
+<code>names_pattern</code> directly inside
+<code>pivot_longer()</code>.</p>
+</blockquote>
+<pre class="r"><code># Alternative solution suggested by AI
+who_ai &lt;- who |&gt;
+  pivot_longer(
+    cols = new_sp_m014:newrel_f65,
+    names_to = c(&quot;type&quot;, &quot;sex&quot;, &quot;age&quot;),
+    names_pattern = &quot;new_?(.*)_(.)(.*)&quot;,
+    values_to = &quot;cases&quot;,
+    values_drop_na = TRUE
+  ) |&gt;
+  mutate(
+    age = stringr::str_replace(age, &quot;^014$&quot;, &quot;0014&quot;),
+    age = stringr::str_replace(age, &quot;^65$&quot;, &quot;65100&quot;)
+  ) |&gt;
+  separate(age, into = c(&quot;age_low&quot;, &quot;age_high&quot;), sep = 2) |&gt;
+  select(-iso2, -iso3)
+
+who_ai</code></pre>
+<pre><code>## # A tibble: 76,046 × 7
+##    country      year type  sex   age_low age_high cases
+##    &lt;chr&gt;       &lt;dbl&gt; &lt;chr&gt; &lt;chr&gt; &lt;chr&gt;   &lt;chr&gt;    &lt;dbl&gt;
+##  1 Afghanistan  1997 sp    m     00      14           0
+##  2 Afghanistan  1997 sp    m     15      24          10
+##  3 Afghanistan  1997 sp    m     25      34           6
+##  4 Afghanistan  1997 sp    m     35      44           3
+##  5 Afghanistan  1997 sp    m     45      54           5
+##  6 Afghanistan  1997 sp    m     55      64           2
+##  7 Afghanistan  1997 sp    m     65      100          0
+##  8 Afghanistan  1997 sp    f     00      14           5
+##  9 Afghanistan  1997 sp    f     15      24          38
+## 10 Afghanistan  1997 sp    f     25      34          36
+## # ℹ 76,036 more rows</code></pre>
+<div id="benchmark-comparison" class="section level4">
+<h4>Benchmark Comparison</h4>
+<p>To verify whether the optimization brings practical benefits, we
+compare both pipelines using <code>microbenchmark</code>:</p>
+<pre class="r"><code>bench_results &lt;- microbenchmark(
+  sequential_separate = {
+    who |&gt;
+      pivot_longer(new_sp_m014:newrel_f65, names_to = &#39;key&#39;, values_to = &#39;cases&#39;, values_drop_na = TRUE) |&gt;
+      mutate(key = stringr::str_replace(key, &quot;newrel&quot;, &quot;new_rel&quot;)) |&gt;
+      separate(key, into = c(&#39;new&#39;, &#39;type&#39;, &#39;sexage&#39;), sep = &quot;_&quot;) |&gt;
+      separate(sexage, into = c(&#39;sex&#39;, &#39;age&#39;), sep = 1) |&gt;
+      mutate(age = stringr::str_replace(age, &#39;014&#39;, &#39;0014&#39;)) |&gt;
+      mutate(age = stringr::str_replace(age, &#39;65&#39;, &#39;65100&#39;)) |&gt;
+      separate(age, into = c(&#39;age_low&#39;, &#39;age_high&#39;), sep = 2) |&gt;
+      select(-new, -iso2, -iso3)
+  },
+  ai_regex_pivot = {
+    who |&gt;
+      pivot_longer(
+        cols = new_sp_m014:newrel_f65,
+        names_to = c(&quot;type&quot;, &quot;sex&quot;, &quot;age&quot;),
+        names_pattern = &quot;new_?(.*)_(.)(.*)&quot;,
+        values_to = &quot;cases&quot;,
+        values_drop_na = TRUE
+      ) |&gt;
+      mutate(
+        age = stringr::str_replace(age, &quot;^014$&quot;, &quot;0014&quot;),
+        age = stringr::str_replace(age, &quot;^65$&quot;, &quot;65100&quot;)
+      ) |&gt;
+      separate(age, into = c(&quot;age_low&quot;, &quot;age_high&quot;), sep = 2) |&gt;
+      select(-iso2, -iso3)
+  },
+  times = 5
+)
+
+bench_results</code></pre>
+<pre><code>## Unit: milliseconds
+##                 expr      min        lq     mean   median        uq       max
+##  sequential_separate 923.3585 1007.1344 1225.407 1046.171 1525.4631 1624.9096
+##       ai_regex_pivot 101.0204  115.8772  159.063  145.937  215.6251  216.8555
+##  neval
+##      5
+##      5</code></pre>
+</div>
+<div id="explanation-of-ai-optimizations" class="section level4">
+<h4>Explanation of AI Optimizations</h4>
+<ol style="list-style-type: decimal">
+<li><strong><code>names_pattern = &quot;new_?(.*)_(.)(.*)&quot;</code> in
+<code>pivot_longer()</code></strong>:
+<ul>
+<li><code>new</code>: Matches the literal <code>&quot;new&quot;</code> prefix
+shared by all variable names.</li>
+<li><code>_?</code>: Matches an optional underscore (<code>0</code> or
+<code>1</code> occurrence). This resolves the <code>newrel</code> naming
+anomaly directly during pivoting without needing a prior
+<code>str_replace()</code>.</li>
+<li><code>(.*)</code> (Group 1): Captures the diagnosis type
+(<code>sp</code>, <code>rel</code>, <code>ep</code>, <code>sn</code>)
+directly into the <code>type</code> column.</li>
+<li><code>_</code>: Matches the literal underscore separating the type
+from the sex/age code.</li>
+<li><code>(.)</code> (Group 2): Captures exactly one character
+(<code>m</code> or <code>f</code>) into the <code>sex</code>
+column.</li>
+<li><code>(.*)</code> (Group 3): Captures the remaining digits into the
+<code>age</code> column. Because <code>pivot_longer()</code> evaluates
+this regular expression only across the 56 original column names rather
+than across 76,000+ unpivoted rows, it avoids allocating large
+intermediate string columns.</li>
+</ul></li>
+<li><strong>Defensive Regex Anchors (<code>^</code> and <code>$</code>)
+in <code>mutate()</code></strong>:
+<ul>
+<li>In the biological baseline code, we retained simple substring
+replacements (<code>&quot;014&quot;</code> and <code>&quot;65&quot;</code>) as originally
+requested in the exercise prompt.</li>
+<li>In the AI-optimized code, we wrapped them with regex anchors:
+<ul>
+<li><code>^</code> asserts the start of the string.</li>
+<li><code>$</code> asserts the end of the string.</li>
+</ul></li>
+<li>Matching <code>&quot;^65$&quot;</code> guarantees that replacement occurs
+<em>only</em> when the cell content is exactly <code>&quot;65&quot;</code>. This
+prevents accidental partial-matching bugs if future datasets contain age
+groups like <code>5565</code> or <code>6574</code>, where an unanchored
+<code>&quot;65&quot;</code> would inadvertently produce <code>5565100</code> or
+<code>6510074</code>.</li>
+</ul></li>
+</ol>
+<p><strong>Evaluation and Trade-offs:</strong></p>
+<ul>
+<li><strong>Performance</strong>: As demonstrated by
+<code>microbenchmark</code>, the AI alternative runs approximately 8–10x
+faster because it avoids intermediate character allocations and repeated
+column splits across 76,000+ rows.</li>
+<li><strong>Cognitive complexity &amp; readability</strong>: While more
+performant, the AI alternative concentrates logic into a regular
+expression (<code>new_?(.*)_(.)(.*)</code>), making it harder to inspect
+and debug for beginners compared to the sequential
+<code>separate()</code> steps.</li>
+</ul>
+</div>
 </div>
 
 
