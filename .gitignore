@@ -4,3 +4,8 @@
 .Ruserdata
 *_cache/
 *_files/
+
+# Claude Code
+.claude/
+CLAUDE.md
+CLAUDE.local.md

@@ -8,19 +8,22 @@ editor_options:
 ```{r setup, include=FALSE}
 # cache results
 knitr::opts_chunk$set(cache=FALSE, echo = TRUE, eval = TRUE, message=FALSE, warning = FALSE, fig.align='center')
+library(tidyr)
 library(dplyr)
 library(purrr)
 library(stringr)
 ```
-This challenge explores all matches of Italian soccer Serie A league from 1993 to current year. The dataset is contained in the website [football-data.co.uk](http://www.football-data.co.uk/italym.php). 
+
+This challenge explores all matches of Italian soccer Serie A league from 1993 to current year. The dataset is contained in the website [football-data.co.uk](http://www.football-data.co.uk/italym.php).
 
 ### Challenges
-1. Think about how to scrape the data from the website, but write no code at this stage.
-2. Ask AI to write code to import data by scraping the website. Select only columns Date, HomeTeam, AwayTeam, FTHG (home team goals), FTAG (away team goals)  and filter rows with a valid (not NA) Date. 
-3. Using dplyr and tidyr packages (no for loops!), compute statistics for every team (matches, wins, loses, draws, points, points per match). Hint: mutate a column with the outcome of the match (for instance, H = home teams wins, A = away team wins, P = draw). Then group by team and outcome (home and away) and hence spread the outcome. Do this step without the use of AI.
-4. Come up with at least 3 data questions on the data at hand. Just write the questions, do not find the answers.
 
-# Our initial idea 
+1.  Think about how to scrape the data from the website, but write no code at this stage.
+2.  Ask AI to write code to import data by scraping the website. Select only columns Date, HomeTeam, AwayTeam, FTHG (home team goals), FTAG (away team goals) and filter rows with a valid (not NA) Date.
+3.  Using dplyr and tidyr packages (no for loops!), compute statistics for every team (matches, wins, loses, draws, points, points per match). Hint: mutate a column with the outcome of the match (for instance, H = home teams wins, A = away team wins, P = draw). Then group by team and outcome (home and away) and hence spread the outcome. Do this step without the use of AI.
+4.  Come up with at least 3 data questions on the data at hand. Just write the questions, do not find the answers.
+
+# Our initial idea
 
 We've seen that all the CSVs we're interested in have a common structure ("cccnnn"/"nnnn"/I1.csv). Hence we thought about scanning the webpage using a regex selecting the file names. Then we could join the names to the site link and read the files directly with read_csv(url()) and finally joining the dataframes, filtering for the requested columns.
 
@@ -45,6 +48,7 @@ head(df_full, n = 10L)
 ```
 
 ### Review of the initial approach
+
 The initial approach correctly identifies the repeating URL pattern and the need to scrape the page dynamically rather than hardcoding seasons. Early column pruning is also effective for memory efficiency. However, scaling across all seasons requires replacing manual variable declarations with loop-free functional mapping, and replacing `full_join()` (a horizontal relational merge) with vertical row stacking (`list_rbind()` / `bind_rows()`).
 
 # AI scrape
@@ -79,7 +83,233 @@ head(serie_a_matches, n = 10L)
 ```
 
 ### Implementation choices
-1. **Dynamic scraping (`readLines` + `str_extract`)**: Scrapes `italym.php` for `mmz4281/\d{4}/I1\.csv`, automatically capturing all historical and newly added seasons without hardcoding dates.
-2. **Defensive NA handling (`na.strings = c("", "NA", " ")`)**: Historical files (e.g. 1993/94) have trailing blank lines where `Date` is `""`. Declaring these as `NA` allows `filter(!is.na(Date))` to cleanly drop them.
-3. **Early column pruning (`select(...)`)**: Modern seasons contain 100+ betting odds columns. Selecting only the 5 required columns inside the reader avoids wasting RAM across 34 seasons.
-4. **Functional iteration without loops (`purrr::map` + `purrr::list_rbind`)**: Iterates through all 34 endpoints and vertically stacks rows into a single 11,786-row dataframe without using forbidden `for` loops.
+
+1.  **Dynamic scraping (`readLines` + `str_extract`)**: Scrapes `italym.php` for `mmz4281/\d{4}/I1\.csv`, automatically capturing all historical and newly added seasons without hardcoding dates.
+2.  **Defensive NA handling (`na.strings = c("", "NA", " ")`)**: Historical files (e.g. 1993/94) have trailing blank lines where `Date` is `""`. Declaring these as `NA` allows `filter(!is.na(Date))` to cleanly drop them.
+3.  **Early column pruning (`select(...)`)**: Modern seasons contain 100+ betting odds columns. Selecting only the 5 required columns inside the reader avoids wasting RAM across 34 seasons.
+4.  **Functional iteration without loops (`purrr::map` + `purrr::list_rbind`)**: Iterates through all 34 endpoints and vertically stacks rows into a single 11,786-row dataframe without using forbidden `for` loops.
+
+# Statistics
+
+Starting by assigning the values of the winners for each game:
+
+```{r}
+ serie_a_matches_m = serie_a_matches |>
+  mutate(Results = ifelse(FTHG > FTAG, 'H', ifelse(FTHG == FTAG, 'P', 'A')))
+
+head(serie_a_matches_m, n = 10L)
+```
+
+Then creating two df were we assign the values of Wins, Losses, Draws, Matches played and Points earned.
+
+- One for the home matches:
+
+```{r}
+stat_H = serie_a_matches_m |>
+  group_by(HomeTeam) |>
+  summarise( 
+    V = sum(Results == 'H'),
+    D = sum(Results == 'P'),
+    L = sum(Results == 'A'),
+    n = n(),
+    p = 3*V+D,
+    ) 
+
+stat_H
+```
+
+- And one for the away matches:
+
+```{r}
+stat_A = serie_a_matches_m |>
+  group_by(AwayTeam) |>
+  summarise( 
+    L = sum(Results == 'H'),
+    D = sum(Results == 'P'),
+    V = sum(Results == 'A'),
+    n = n(),
+    p = 3*V+D,
+    )
+```
+
+Ultimately binding them together using a `left_join`, calculating the mean of point per match, selecting only the columns that we want and order all df by Points and Mean point per match with `arrange`
+
+```{r}
+stat = stat_H |>
+  left_join(stat_A, by = c('HomeTeam' = 'AwayTeam')) |>
+  rename(Team = HomeTeam) |>
+  mutate (
+    Vict = V.x + V.y,
+    Draw = D.x + D.y,
+    Lose = L.x + L.y,
+    Match = n.x + n.y,
+    Points = p.x + p.y,
+    Mean_point_for_match = (p.x+p.y)/(n.x+n.y)
+    ) |>
+  select(Team, Match, Vict, Draw, Lose, Points, Mean_point_for_match) |>
+  arrange(desc(Points), desc(Mean_point_for_match))
+
+stat
+
+```
+
+## AI approach
+
+We've then asked the AI to generate a possible alternative approach and it came up with this solution:
+
+```{r}
+ai_stat = serie_a_matches |>
+    mutate(
+      Result = case_when(
+        FTHG > FTAG ~ "H",
+        FTHG < FTAG ~ "A",
+        TRUE        ~ "P"
+      ),
+      Match_id = row_number()
+    ) |>
+    pivot_longer(
+      cols = c(HomeTeam, AwayTeam),
+      names_to = "Venue",
+      values_to = "Team"
+    ) |>
+    mutate(
+      Outcome = case_when(
+        Result == "P"                              ~ "Draw",
+        Result == "H" & Venue == "HomeTeam"        ~ "Win",
+        Result == "A" & Venue == "AwayTeam"        ~ "Win",
+        TRUE                                       ~ "Loss"
+      ),
+      Goals = if_else(Venue == "HomeTeam", FTHG, FTAG)
+    ) |>
+    group_by(Team, Outcome) |>
+    summarise(n = n(), Goals = sum(Goals), .groups = "drop") |>
+    pivot_wider(
+      names_from = Outcome,
+      values_from = c(n, Goals),
+      values_fill = 0
+    ) |>
+    mutate(
+      Matches = n_Win + n_Draw + n_Loss,
+      Points = 3*n_Win + n_Draw,
+      Points_per_match = Points / Matches
+    ) |>
+    rename(Win = n_Win, Draw = n_Draw, Loss = n_Loss) |>
+    select(Team, Matches, Win, Draw, Loss, Points, Points_per_match) |>
+    arrange(desc(Points_per_match))
+
+ai_stat
+```
+
+Giving us this explanation:
+
+The AI solution follows a **"tidy / long format"** approach: instead of computing separate statistics for home and away matches and then merging them (as we did), it first reshapes the data so that every team appears in a single `Team` column, and then computes all the statistics with one single `group_by()` + `summarise()`. The pipeline is made of the following components:
+
+1.  **`mutate()` + `case_when()` (match result)**: creates the `Result` column (`H` = home win, `A` = away win, `P` = draw) by comparing `FTHG` and `FTAG`. `case_when()` is a vectorised, more readable alternative to nested `ifelse()`. `Match_id = row_number()` assigns a unique id to every match (it is not strictly needed for the final statistics, but it keeps track of the original match after the reshaping).
+2.  **`pivot_longer()` (wide to long)**: the columns `HomeTeam` and `AwayTeam` are stacked into a single `Team` column, while the old column name is saved in `Venue`. Every match becomes two rows, one per team, so the data frame doubles in size (11,786 matches become 23,572 rows). This is the key step: from now on there is no need to treat home and away teams separately.
+3.  **`mutate()` + `case_when()` (outcome from the team's point of view)**: combines `Result` and `Venue` to label each row as `Win`, `Draw` or `Loss` for that specific team (e.g. `Result == "H"` is a `Win` only if the team was playing at home). `Goals` is computed with `if_else()` and contains the goals scored by that team (`FTHG` if home, `FTAG` if away).
+4.  **`group_by(Team, Outcome)` + `summarise()`**: counts the number of matches (`n`) and sums the goals for every combination of team and outcome. `.groups = "drop"` removes the grouping afterwards, so that the following steps are not affected by it.
+5.  **`pivot_wider()` (long to wide)**: spreads the `Outcome` values into columns (`n_Win`, `n_Draw`, `n_Loss`, and the corresponding `Goals_*`), obtaining one row per team. `values_fill = 0` replaces the missing combinations (for instance a team that never lost) with `0` instead of `NA`.
+6.  **`mutate()` (final statistics)**: computes `Matches` (sum of the three outcomes), `Points` (`3*Win + Draw`) and `Points_per_match`.
+7.  **`rename()`, `select()` and `arrange()`**: tidy the column names, keep only the columns of interest and sort the teams by points per match in descending order.
+
+The main difference with our solution is therefore the strategy: we **split, compute and merge** (two summaries + `left_join`, which also requires swapping the meaning of `V` and `L` for the away matches), while the AI **reshapes first and aggregates once**, using the `pivot_longer()` / `pivot_wider()` pair from `tidyr`. This makes the code more compact and less error-prone (no duplicated logic, no `.x`/`.y` suffixes) and it also gives the goals scored for free, at the cost of creating a temporary data frame twice as big as the original one.
+
+## Benchmark
+
+```{r}
+
+library(microbenchmark)
+
+bench_results <- microbenchmark(
+  our_solution = {
+    stat_H = serie_a_matches_m |>
+      group_by(HomeTeam) |>
+      summarise( 
+        V = sum(Results == 'H'),
+        D = sum(Results == 'P'),
+        L = sum(Results == 'A'),
+        n = n(),
+        p = sum(FTHG),
+        ) 
+    
+    stat_A = serie_a_matches_m |>
+      group_by(AwayTeam) |>
+      summarise( 
+        L = sum(Results == 'H'),
+        D = sum(Results == 'P'),
+        V = sum(Results == 'A'),
+        n = n(),
+        p = sum(FTAG),
+        )
+    
+    stat = stat_H |>
+      left_join(stat_A, by = c('HomeTeam' = 'AwayTeam')) |>
+      rename(Team = HomeTeam) |>
+      mutate (
+        Vict = V.x + V.y,
+        Draw = D.x + D.y,
+        Lose = L.x + L.y,
+        Match = n.x + n.y,
+        Points = p.x + p.y,
+        Mean_point_for_match = (p.x+p.y)/(n.x+n.y)
+        ) |>
+      select(Team, Match, Vict, Draw, Lose, Points, Mean_point_for_match)
+  },
+  ai_solution = {
+    ai_stat = serie_a_matches |>
+    mutate(
+      Result = case_when(
+        FTHG > FTAG ~ "H",
+        FTHG < FTAG ~ "A",
+        TRUE        ~ "P"
+      ),
+      Match_id = row_number()
+    ) |>
+    pivot_longer(
+      cols = c(HomeTeam, AwayTeam),
+      names_to = "Venue",
+      values_to = "Team"
+    ) |>
+    mutate(
+      Outcome = case_when(
+        Result == "P"                              ~ "Draw",
+        Result == "H" & Venue == "HomeTeam"        ~ "Win",
+        Result == "A" & Venue == "AwayTeam"        ~ "Win",
+        TRUE                                       ~ "Loss"
+      ),
+      Goals = if_else(Venue == "HomeTeam", FTHG, FTAG)
+    ) |>
+    group_by(Team, Outcome) |>
+    summarise(n = n(), Goals = sum(Goals), .groups = "drop") |>
+    pivot_wider(
+      names_from = Outcome,
+      values_from = c(n, Goals),
+      values_fill = 0
+    ) |>
+    mutate(
+      Matches = n_Win + n_Draw + n_Loss,
+      Points = Goals_Win + Goals_Draw + Goals_Loss,
+      Points_per_match = Points / Matches
+    ) |>
+    rename(Win = n_Win, Draw = n_Draw, Loss = n_Loss) |>
+    select(Team, Matches, Win, Draw, Loss, Points, Points_per_match) |>
+    arrange(desc(Points_per_match))
+  },
+  times = 20
+)
+
+bench_results
+```
+
+Seeing the results of the benchmark we can say that our solution is faster than the AI one: with 20 repetitions the median execution time is about 3 ms against about 5 ms, i.e. roughly 1.6 times faster. This is expected, since our approach only aggregates the original 11,786 rows twice and joins two tiny tables, while the AI approach first doubles the data with `pivot_longer()` and then needs an extra `pivot_wider()` step. However, the difference is a matter of a few milliseconds on a small dataset, so in practice both solutions are equally fast and the choice should be driven by readability and maintainability, where the AI long-format approach is arguably cleaner.
+
+# Questions
+
+1.  Which is a better value to use in order to compare the strength of a team: the Points made or the PPG?
+
+2.  Which team has the highest ratio of victories to losses?
+
+3.  Do teams win ratios vary between playing home / away games? (having the possibility to work with the data before they're processed)
+
+
+

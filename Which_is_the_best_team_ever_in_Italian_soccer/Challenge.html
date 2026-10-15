@@ -484,6 +484,332 @@ without using forbidden <code>for</code> loops.</li>
 </ol>
 </div>
 </div>
+<div id="statistics" class="section level1">
+<h1>Statistics</h1>
+<p>Starting by assigning the values of the winners for each game:</p>
+<pre class="r"><code> serie_a_matches_m = serie_a_matches |&gt;
+  mutate(Results = ifelse(FTHG &gt; FTAG, &#39;H&#39;, ifelse(FTHG == FTAG, &#39;P&#39;, &#39;A&#39;)))
+
+head(serie_a_matches_m, n = 10L)</code></pre>
+<pre><code>##          Date  HomeTeam   AwayTeam FTHG FTAG Results
+## 1  22/08/2026     Inter      Monza    4    1       H
+## 2  22/08/2026   Udinese       Como    1    1       P
+## 3  22/08/2026     Genoa     Napoli    0    2       A
+## 4  22/08/2026     Parma   Cagliari    0    1       A
+## 5  23/08/2026 Frosinone   Juventus    0    1       A
+## 6  23/08/2026   Venezia      Lecce    0    2       A
+## 7  23/08/2026  Atalanta   Sassuolo    2    1       H
+## 8  23/08/2026    Torino      Milan    1    2       A
+## 9  24/08/2026   Bologna      Lazio    0    1       A
+## 10 24/08/2026      Roma Fiorentina    4    0       H</code></pre>
+<p>Then creating two df were we assign the values of Wins, Losses,
+Draws, Matches played and Points earned.</p>
+<ul>
+<li>One for the home matches:</li>
+</ul>
+<pre class="r"><code>stat_H = serie_a_matches_m |&gt;
+  group_by(HomeTeam) |&gt;
+  summarise( 
+    V = sum(Results == &#39;H&#39;),
+    D = sum(Results == &#39;P&#39;),
+    L = sum(Results == &#39;A&#39;),
+    n = n(),
+    p = 3*V+D,
+    ) 
+
+stat_H</code></pre>
+<pre><code>## # A tibble: 53 × 6
+##    HomeTeam      V     D     L     n     p
+##    &lt;chr&gt;     &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;dbl&gt;
+##  1 Ancona        2     6     9    17    12
+##  2 Ascoli       10    16    12    38    46
+##  3 Atalanta    220   149   134   503   809
+##  4 Bari         47    46    47   140   187
+##  5 Benevento     7     9    22    38    30
+##  6 Bologna     196   135   150   481   723
+##  7 Brescia      46    53    60   159   191
+##  8 Cagliari    188   140   157   485   704
+##  9 Carpi         6     5     8    19    23
+## 10 Catania      73    39    40   152   258
+## # ℹ 43 more rows</code></pre>
+<ul>
+<li>And one for the away matches:</li>
+</ul>
+<pre class="r"><code>stat_A = serie_a_matches_m |&gt;
+  group_by(AwayTeam) |&gt;
+  summarise( 
+    L = sum(Results == &#39;H&#39;),
+    D = sum(Results == &#39;P&#39;),
+    V = sum(Results == &#39;A&#39;),
+    n = n(),
+    p = 3*V+D,
+    )</code></pre>
+<p>Ultimately binding them together using a <code>left_join</code>,
+calculating the mean of point per match, selecting only the columns that
+we want and order all df by Points and Mean point per match with
+<code>arrange</code></p>
+<pre class="r"><code>stat = stat_H |&gt;
+  left_join(stat_A, by = c(&#39;HomeTeam&#39; = &#39;AwayTeam&#39;)) |&gt;
+  rename(Team = HomeTeam) |&gt;
+  mutate (
+    Vict = V.x + V.y,
+    Draw = D.x + D.y,
+    Lose = L.x + L.y,
+    Match = n.x + n.y,
+    Points = p.x + p.y,
+    Mean_point_for_match = (p.x+p.y)/(n.x+n.y)
+    ) |&gt;
+  select(Team, Match, Vict, Draw, Lose, Points, Mean_point_for_match) |&gt;
+  arrange(desc(Points), desc(Mean_point_for_match))
+
+stat</code></pre>
+<pre><code>## # A tibble: 53 × 7
+##    Team       Match  Vict  Draw  Lose Points Mean_point_for_match
+##    &lt;chr&gt;      &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;dbl&gt;                &lt;dbl&gt;
+##  1 Juventus    1178   716   290   172   2438                 2.07
+##  2 Inter       1216   670   290   256   2300                 1.89
+##  3 Milan       1216   634   325   257   2227                 1.83
+##  4 Roma        1216   619   316   281   2173                 1.79
+##  5 Lazio       1216   579   298   339   2035                 1.67
+##  6 Fiorentina  1114   443   317   354   1646                 1.48
+##  7 Napoli       932   456   235   241   1603                 1.72
+##  8 Udinese     1182   415   308   459   1553                 1.31
+##  9 Atalanta    1004   374   278   352   1400                 1.39
+## 10 Parma        950   333   272   345   1271                 1.34
+## # ℹ 43 more rows</code></pre>
+<div id="ai-approach" class="section level2">
+<h2>AI approach</h2>
+<p>We’ve then asked the AI to generate a possible alternative approach
+and it came up with this solution:</p>
+<pre class="r"><code>ai_stat = serie_a_matches |&gt;
+    mutate(
+      Result = case_when(
+        FTHG &gt; FTAG ~ &quot;H&quot;,
+        FTHG &lt; FTAG ~ &quot;A&quot;,
+        TRUE        ~ &quot;P&quot;
+      ),
+      Match_id = row_number()
+    ) |&gt;
+    pivot_longer(
+      cols = c(HomeTeam, AwayTeam),
+      names_to = &quot;Venue&quot;,
+      values_to = &quot;Team&quot;
+    ) |&gt;
+    mutate(
+      Outcome = case_when(
+        Result == &quot;P&quot;                              ~ &quot;Draw&quot;,
+        Result == &quot;H&quot; &amp; Venue == &quot;HomeTeam&quot;        ~ &quot;Win&quot;,
+        Result == &quot;A&quot; &amp; Venue == &quot;AwayTeam&quot;        ~ &quot;Win&quot;,
+        TRUE                                       ~ &quot;Loss&quot;
+      ),
+      Goals = if_else(Venue == &quot;HomeTeam&quot;, FTHG, FTAG)
+    ) |&gt;
+    group_by(Team, Outcome) |&gt;
+    summarise(n = n(), Goals = sum(Goals), .groups = &quot;drop&quot;) |&gt;
+    pivot_wider(
+      names_from = Outcome,
+      values_from = c(n, Goals),
+      values_fill = 0
+    ) |&gt;
+    mutate(
+      Matches = n_Win + n_Draw + n_Loss,
+      Points = 3*n_Win + n_Draw,
+      Points_per_match = Points / Matches
+    ) |&gt;
+    rename(Win = n_Win, Draw = n_Draw, Loss = n_Loss) |&gt;
+    select(Team, Matches, Win, Draw, Loss, Points, Points_per_match) |&gt;
+    arrange(desc(Points_per_match))
+
+ai_stat</code></pre>
+<pre><code>## # A tibble: 53 × 7
+##    Team       Matches   Win  Draw  Loss Points Points_per_match
+##    &lt;chr&gt;        &lt;int&gt; &lt;int&gt; &lt;int&gt; &lt;int&gt;  &lt;dbl&gt;            &lt;dbl&gt;
+##  1 Juventus      1178   716   290   172   2438             2.07
+##  2 Inter         1216   670   290   256   2300             1.89
+##  3 Milan         1216   634   325   257   2227             1.83
+##  4 Roma          1216   619   316   281   2173             1.79
+##  5 Napoli         932   456   235   241   1603             1.72
+##  6 Lazio         1216   579   298   339   2035             1.67
+##  7 Fiorentina    1114   443   317   354   1646             1.48
+##  8 Atalanta      1004   374   278   352   1400             1.39
+##  9 Parma          950   333   272   345   1271             1.34
+## 10 Como           116    40    35    41    155             1.34
+## # ℹ 43 more rows</code></pre>
+<p>Giving us this explanation:</p>
+<p>The AI solution follows a <strong>“tidy / long format”</strong>
+approach: instead of computing separate statistics for home and away
+matches and then merging them (as we did), it first reshapes the data so
+that every team appears in a single <code>Team</code> column, and then
+computes all the statistics with one single <code>group_by()</code> +
+<code>summarise()</code>. The pipeline is made of the following
+components:</p>
+<ol style="list-style-type: decimal">
+<li><strong><code>mutate()</code> + <code>case_when()</code> (match
+result)</strong>: creates the <code>Result</code> column (<code>H</code>
+= home win, <code>A</code> = away win, <code>P</code> = draw) by
+comparing <code>FTHG</code> and <code>FTAG</code>.
+<code>case_when()</code> is a vectorised, more readable alternative to
+nested <code>ifelse()</code>. <code>Match_id = row_number()</code>
+assigns a unique id to every match (it is not strictly needed for the
+final statistics, but it keeps track of the original match after the
+reshaping).</li>
+<li><strong><code>pivot_longer()</code> (wide to long)</strong>: the
+columns <code>HomeTeam</code> and <code>AwayTeam</code> are stacked into
+a single <code>Team</code> column, while the old column name is saved in
+<code>Venue</code>. Every match becomes two rows, one per team, so the
+data frame doubles in size (11,786 matches become 23,572 rows). This is
+the key step: from now on there is no need to treat home and away teams
+separately.</li>
+<li><strong><code>mutate()</code> + <code>case_when()</code> (outcome
+from the team’s point of view)</strong>: combines <code>Result</code>
+and <code>Venue</code> to label each row as <code>Win</code>,
+<code>Draw</code> or <code>Loss</code> for that specific team
+(e.g. <code>Result == &quot;H&quot;</code> is a <code>Win</code> only if the team
+was playing at home). <code>Goals</code> is computed with
+<code>if_else()</code> and contains the goals scored by that team
+(<code>FTHG</code> if home, <code>FTAG</code> if away).</li>
+<li><strong><code>group_by(Team, Outcome)</code> +
+<code>summarise()</code></strong>: counts the number of matches
+(<code>n</code>) and sums the goals for every combination of team and
+outcome. <code>.groups = &quot;drop&quot;</code> removes the grouping afterwards,
+so that the following steps are not affected by it.</li>
+<li><strong><code>pivot_wider()</code> (long to wide)</strong>: spreads
+the <code>Outcome</code> values into columns (<code>n_Win</code>,
+<code>n_Draw</code>, <code>n_Loss</code>, and the corresponding
+<code>Goals_*</code>), obtaining one row per team.
+<code>values_fill = 0</code> replaces the missing combinations (for
+instance a team that never lost) with <code>0</code> instead of
+<code>NA</code>.</li>
+<li><strong><code>mutate()</code> (final statistics)</strong>: computes
+<code>Matches</code> (sum of the three outcomes), <code>Points</code>
+(<code>3*Win + Draw</code>) and <code>Points_per_match</code>.</li>
+<li><strong><code>rename()</code>, <code>select()</code> and
+<code>arrange()</code></strong>: tidy the column names, keep only the
+columns of interest and sort the teams by points per match in descending
+order.</li>
+</ol>
+<p>The main difference with our solution is therefore the strategy: we
+<strong>split, compute and merge</strong> (two summaries +
+<code>left_join</code>, which also requires swapping the meaning of
+<code>V</code> and <code>L</code> for the away matches), while the AI
+<strong>reshapes first and aggregates once</strong>, using the
+<code>pivot_longer()</code> / <code>pivot_wider()</code> pair from
+<code>tidyr</code>. This makes the code more compact and less
+error-prone (no duplicated logic, no <code>.x</code>/<code>.y</code>
+suffixes) and it also gives the goals scored for free, at the cost of
+creating a temporary data frame twice as big as the original one.</p>
+</div>
+<div id="benchmark" class="section level2">
+<h2>Benchmark</h2>
+<pre class="r"><code>library(microbenchmark)
+
+bench_results &lt;- microbenchmark(
+  our_solution = {
+    stat_H = serie_a_matches_m |&gt;
+      group_by(HomeTeam) |&gt;
+      summarise( 
+        V = sum(Results == &#39;H&#39;),
+        D = sum(Results == &#39;P&#39;),
+        L = sum(Results == &#39;A&#39;),
+        n = n(),
+        p = sum(FTHG),
+        ) 
+    
+    stat_A = serie_a_matches_m |&gt;
+      group_by(AwayTeam) |&gt;
+      summarise( 
+        L = sum(Results == &#39;H&#39;),
+        D = sum(Results == &#39;P&#39;),
+        V = sum(Results == &#39;A&#39;),
+        n = n(),
+        p = sum(FTAG),
+        )
+    
+    stat = stat_H |&gt;
+      left_join(stat_A, by = c(&#39;HomeTeam&#39; = &#39;AwayTeam&#39;)) |&gt;
+      rename(Team = HomeTeam) |&gt;
+      mutate (
+        Vict = V.x + V.y,
+        Draw = D.x + D.y,
+        Lose = L.x + L.y,
+        Match = n.x + n.y,
+        Points = p.x + p.y,
+        Mean_point_for_match = (p.x+p.y)/(n.x+n.y)
+        ) |&gt;
+      select(Team, Match, Vict, Draw, Lose, Points, Mean_point_for_match)
+  },
+  ai_solution = {
+    ai_stat = serie_a_matches |&gt;
+    mutate(
+      Result = case_when(
+        FTHG &gt; FTAG ~ &quot;H&quot;,
+        FTHG &lt; FTAG ~ &quot;A&quot;,
+        TRUE        ~ &quot;P&quot;
+      ),
+      Match_id = row_number()
+    ) |&gt;
+    pivot_longer(
+      cols = c(HomeTeam, AwayTeam),
+      names_to = &quot;Venue&quot;,
+      values_to = &quot;Team&quot;
+    ) |&gt;
+    mutate(
+      Outcome = case_when(
+        Result == &quot;P&quot;                              ~ &quot;Draw&quot;,
+        Result == &quot;H&quot; &amp; Venue == &quot;HomeTeam&quot;        ~ &quot;Win&quot;,
+        Result == &quot;A&quot; &amp; Venue == &quot;AwayTeam&quot;        ~ &quot;Win&quot;,
+        TRUE                                       ~ &quot;Loss&quot;
+      ),
+      Goals = if_else(Venue == &quot;HomeTeam&quot;, FTHG, FTAG)
+    ) |&gt;
+    group_by(Team, Outcome) |&gt;
+    summarise(n = n(), Goals = sum(Goals), .groups = &quot;drop&quot;) |&gt;
+    pivot_wider(
+      names_from = Outcome,
+      values_from = c(n, Goals),
+      values_fill = 0
+    ) |&gt;
+    mutate(
+      Matches = n_Win + n_Draw + n_Loss,
+      Points = Goals_Win + Goals_Draw + Goals_Loss,
+      Points_per_match = Points / Matches
+    ) |&gt;
+    rename(Win = n_Win, Draw = n_Draw, Loss = n_Loss) |&gt;
+    select(Team, Matches, Win, Draw, Loss, Points, Points_per_match) |&gt;
+    arrange(desc(Points_per_match))
+  },
+  times = 20
+)
+
+bench_results</code></pre>
+<pre><code>## Unit: milliseconds
+##          expr      min       lq     mean   median       uq      max neval
+##  our_solution 3.824849 3.905619 4.727403 4.349628 5.325982 7.094640    20
+##   ai_solution 6.047254 6.533658 6.971496 6.877176 7.233937 8.562071    20</code></pre>
+<p>Seeing the results of the benchmark we can say that our solution is
+faster than the AI one: with 20 repetitions the median execution time is
+about 3 ms against about 5 ms, i.e. roughly 1.6 times faster. This is
+expected, since our approach only aggregates the original 11,786 rows
+twice and joins two tiny tables, while the AI approach first doubles the
+data with <code>pivot_longer()</code> and then needs an extra
+<code>pivot_wider()</code> step. However, the difference is a matter of
+a few milliseconds on a small dataset, so in practice both solutions are
+equally fast and the choice should be driven by readability and
+maintainability, where the AI long-format approach is arguably
+cleaner.</p>
+</div>
+</div>
+<div id="questions" class="section level1">
+<h1>Questions</h1>
+<ol style="list-style-type: decimal">
+<li><p>Which is a better value to use in order to compare the strength
+of a team: the Points made or the PPG?</p></li>
+<li><p>Which team has the highest ratio of victories to losses?</p></li>
+<li><p>Do teams win ratios vary between playing home / away games?
+(having the possibility to work with the data before they’re
+processed)</p></li>
+</ol>
+</div>
 
 
 
