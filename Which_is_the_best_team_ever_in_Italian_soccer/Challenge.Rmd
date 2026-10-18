@@ -305,11 +305,9 @@ Seeing the results of the benchmark we can say that our solution is faster than 
 
 # Questions
 
-1.  Which is a better value to use in order to compare the strength of a team: the Points made or the PPG?
-
-2.  Which team has the highest ratio of victories to losses?
-
-3.  Do teams win ratios vary between playing home / away games? (having the possibility to work with the data before they're processed)
-
+1. Which is a better value to use in order to compare the strength of a team: the Points made or the PPG?
+2. Which team has the highest ratio of victories to losses?
+3. Do teams win ratios vary between playing home / away games?
+4. (Bonus). What's the success ratio for ex-Serie B teams moving to Serie A (involving the download of the Serie B datasets as well)?
 
 

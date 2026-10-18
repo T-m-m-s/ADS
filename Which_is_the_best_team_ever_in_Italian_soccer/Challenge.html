@@ -784,8 +784,8 @@ bench_results &lt;- microbenchmark(
 bench_results</code></pre>
 <pre><code>## Unit: milliseconds
 ##          expr      min       lq     mean   median       uq      max neval
-##  our_solution 3.824849 3.905619 4.727403 4.349628 5.325982 7.094640    20
-##   ai_solution 6.047254 6.533658 6.971496 6.877176 7.233937 8.562071    20</code></pre>
+##  our_solution 28.02499 30.40773 34.92476 33.43254 36.37409 51.59546    20
+##   ai_solution 40.17712 49.55555 55.75430 56.03554 60.21422 86.87576    20</code></pre>
 <p>Seeing the results of the benchmark we can say that our solution is
 faster than the AI one: with 20 repetitions the median execution time is
 about 3 ms against about 5 ms, i.e. roughly 1.6 times faster. This is
@@ -802,12 +802,12 @@ cleaner.</p>
 <div id="questions" class="section level1">
 <h1>Questions</h1>
 <ol style="list-style-type: decimal">
-<li><p>Which is a better value to use in order to compare the strength
-of a team: the Points made or the PPG?</p></li>
-<li><p>Which team has the highest ratio of victories to losses?</p></li>
-<li><p>Do teams win ratios vary between playing home / away games?
-(having the possibility to work with the data before they’re
-processed)</p></li>
+<li>Which is a better value to use in order to compare the strength of a
+team: the Points made or the PPG?</li>
+<li>Which team has the highest ratio of victories to losses?</li>
+<li>Do teams win ratios vary between playing home / away games?</li>
+<li>(Bonus). What’s the success ratio for ex-Serie B teams moving to
+Serie A (involving the download of the Serie B datasets as well)?</li>
 </ol>
 </div>
 
