@@ -7,89 +7,124 @@ output: html_document
 knitr::opts_chunk$set(cache = FALSE, eval = TRUE, echo = TRUE, message = FALSE, warning = FALSE)
 ```
 
-
 ## Interactive gapminder
 
-1. Design the following [shiny app](https://exptime.shinyapps.io/gapminder/) using gapminder dataset
-1. Create an account on [Shinyapps.io](https://www.shinyapps.io/) and [deploy](https://docs.rstudio.com/shinyapps.io/getting-started.html#installation) your app there
-
-<!--![](shiny.png)-->
+1.  Design the following [shiny app](https://exptime.shinyapps.io/gapminder/) using gapminder dataset
+2.  Create an account on [Shinyapps.io](https://www.shinyapps.io/) and [deploy](https://docs.rstudio.com/shinyapps.io/getting-started.html#installation) your app there
 
 
-```{r echo=FALSE, eval=FALSE}
+## Our solution
+
+Prima di tutto vedo come è fattoil dataset.
+
+```{r}
 library(gapminder)
 library(dplyr)
 library(ggplot2)
 library(shiny)
 
+df = gapminder
 
-ui = fluidPage(
-  
-  titlePanel("Gapminder Data"),
+df
+```
+
+Prima di tutto creo la ui:
+
+```{r}
+ui <- fluidPage(
+  titlePanel("Shiny Gapminder"),
   
   sidebarLayout(
-    sidebarPanel(
-      # Year input
-      sliderInput("year",
-                  "Year",
-                  min = 1952,
-                  max = 2007,
-                  step = 5,
-                  value = 1952),
-      
-      # Continent input
-      selectInput("continent", "Continent", 
-                  choices = list("Africa", "Americas", "Asia", "Europe", "Oceania", "All"), 
-                  selected = "All"),
-      # x input
-      radioButtons("xaxis", "X",
-                   choices = list("Life expectancy" = "lifeExp", 
-                                  "Population" = "pop", 
-                                  "GDP per capita" = "gdpPercap"), 
-                   selected = "gdpPercap"),
-      
-      
-      # y input
-      radioButtons("yaxis", "Y",
-                   choices = list("Life expectancy" = "lifeExp", 
-                                  "Population" = "pop", 
-                                  "GDP per capita" = "gdpPercap"), 
-                   selected = "lifeExp")
-      
     
+    sidebarPanel(
+  
+      # Lo slider
+      sliderInput(
+        inputId = "yr",
+        label = "Year",
+        min = min(df$year),
+        max = max(df$year),
+        value = min(df$year),
+        step = 5
+      ),
+      
+      selectInput(
+        inputId = "cont",
+        label = "Continent",
+        choices = c(
+          "Africa" = "Africa",
+          "Americas" = "Americas",
+          "Asia" = "Asia",
+          "Europa" = "Europe",
+          "Oceania" = "Oceania",
+          "All" = "All"
+        ),
+        selected = "All"
+      ),
+      
+      radioButtons(
+        inputId = "xas",
+        label = "X",
+        choices = c(
+          "Life Expentacy" = "lifeExp",
+          "Population" = "pop",
+          "GDP per capita" = "gdpPercap"
+        ),
+        selected = "lifeExp"
+      ),
+      
+      radioButtons(
+        inputId = "yas",
+        label = "Y",
+        choices = c(
+          "Life Expentacy" = "lifeExp",
+          "Population" = "pop",
+          "GDP per capita" = "gdpPercap"
+        ),
+        selected = "gdpPercap"
+      ),
     ),
     
-    
-    # scatter plot output
     mainPanel(
-      plotOutput("scatterPlot")
+      plotOutput("scatter"),
     )
+    
   )
 )
+```
 
+Poi creo la parte del server:
+
+```{r}
 server <- function(input, output) {
   
-  output$scatterPlot <- renderPlot({
-    # generate dataset
-    if (input$continent == "All") {
-      dataset = filter(gapminder, year == input$year)
+  # Scatterplot
+  output$scatter <- renderPlot({
+
+    #year filter
+    if( input$cont == "All"){
+      df = df |>
+        filter(year == input$yr)
     } else {
-      dataset = filter(gapminder, year == input$year, continent == input$continent)
+      df = df |>
+        filter(year == input$yr, continent == input$cont)
     }
-    
-    # draw the scatter plot
-    ggplot(dataset, aes_string(input$xaxis, input$yaxis, size = "pop", colour = "country")) +
+
+    df |>
+      ggplot(aes(x = .data[[input$xas]], y = .data[[input$yas]], size = pop, colour = country)) +
       geom_point(alpha = 0.5, show.legend = FALSE) +
-      scale_colour_manual(values = country_colors) +
+      scale_color_manual(values = country_colors) +
       scale_size(range = c(2, 20)) +
       scale_x_log10() +
       scale_y_log10() +
       theme_minimal()
-    })
+
+  })
 }
-
-
 shinyApp(ui = ui, server = server)
-
-
 ```
+
+Suggerimenti della ai: 
+- .data[[input$xas]] usando aes, invece di usare aes_string che è deprecato
+
+
