@@ -1,0 +1,10 @@
+name: interactive_gapminder
+title:
+username: t-m-m-s
+account: t-m-m-s
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 18238555
+bundleId: 12730928
+url: https://t-m-m-s.shinyapps.io/interactive_gapminder/
+version: 1
