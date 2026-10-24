@@ -499,7 +499,7 @@ the total never changes.</p>
 <h3>Question 4</h3>
 <p>Write a function that computes the player Elo rating (set <span class="math inline">\(\zeta = 400\)</span> and <span class="math inline">\(\kappa = 25\)</span>) (Hint: take advantage of the
 0-sum property to optimize the code). Observe its distribution: why is
-different from the point distribution? Verify the 0-sum property for
+it different from the point distribution? Verify the 0-sum property for
 Elo’s ratings</p>
 <pre class="r"><code>elo_rating = function(games, zeta = 400, kappa = 25) {
   ratings = rep(0, max(games$White, games$Black))
@@ -584,10 +584,10 @@ different one. For points there’s almost a perfect relation: each game
 adds points, so the correlation is 0.99. For Elo the effect is weaker
 (correlation 0.64) and not guaranteed: players with few games stay close
 to 0, while players with many games spread out, and the ones who play
-the most have a high Elo. Playing a lot doesn’t raise the Elo by itself.
-The likely reason is that good players keep playing, and their rating
-needs many games to move far from 0, so more games also means more room
-to win or lose rating.</p>
+the most tend to have a high Elo. Playing a lot doesn’t raise the Elo by
+itself. The likely reason is that good players keep playing, and their
+rating needs many games to move far from 0, so more games also means
+more room to win or lose rating.</p>
 </div>
 </div>
 
