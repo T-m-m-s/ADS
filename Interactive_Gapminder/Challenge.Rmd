@@ -28,7 +28,7 @@ ui <- fluidPage(
   titlePanel("Shiny Gapminder"),
   sidebarLayout(
     sidebarPanel(
-      sliderInput("year", "Year", min = 1952, max = 2007, step = 5, value = 1952, sep = "", animate = TRUE),
+      sliderInput("year", "Year", min = min(gapminder$year), max = max(gapminder$year), step = 5, value = min(gapminder$year), sep = "", animate = TRUE),
       selectInput("continent", "Continent",
                   choices = c("All", levels(gapminder$continent))),
       radioButtons("xaxis", "X", choices = axis_choices, selected = "gdpPercap"),
