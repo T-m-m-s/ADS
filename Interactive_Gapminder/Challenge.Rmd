@@ -13,6 +13,8 @@ knitr::opts_chunk$set(cache = FALSE, eval = TRUE, echo = TRUE, message = FALSE, 
 1. Design the following [shiny app](https://exptime.shinyapps.io/gapminder/) using gapminder dataset
 1. Create an account on [Shinyapps.io](https://www.shinyapps.io/) and [deploy](https://docs.rstudio.com/shinyapps.io/getting-started.html#installation) your app there
 
+Deployed app: [https://t-m-m-s.shinyapps.io/interactive_gapminder/](https://t-m-m-s.shinyapps.io/interactive_gapminder/)
+
 <!--![](shiny.png)-->
 
 
