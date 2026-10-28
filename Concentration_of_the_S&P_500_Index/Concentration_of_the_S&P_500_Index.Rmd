@@ -7,12 +7,11 @@ output: html_document
 knitr::opts_chunk$set(cache = TRUE, echo = TRUE, message = FALSE)
 ```
 
-In this data challege we study how concentrated the S&P 500 is among its constituent companies. 
+In this data challege we study how concentrated the S&P 500 is among its constituent companies.
 
-1. The S&P 500 (Standard & Poor's 500) is a stock market index that tracks the performance of 500 of the largest publicly traded companies in the United States.
-2. It covers roughly 80% of the total value of the U.S. stock market.
-3. It is a market-capitalization-weighted index. Larger companies have a much bigger impact on its value than smaller components
-
+1.  The S&P 500 (Standard & Poor's 500) is a stock market index that tracks the performance of 500 of the largest publicly traded companies in the United States.
+2.  It covers roughly 80% of the total value of the U.S. stock market.
+3.  It is a market-capitalization-weighted index. Larger companies have a much bigger impact on its value than smaller components
 
 We will use:
 
@@ -24,7 +23,7 @@ library(ineq)
 
 The three packages have different roles:
 
-```text
+``` text
 tidyquant    retrieve the S&P 500 constituents and weights
 tidyverse    manipulate and visualize the data
 ineq         calculate the Lorenz curve and Gini coefficient
@@ -32,8 +31,36 @@ ineq         calculate the Lorenz curve and Gini coefficient
 
 Our main questions are:
 
-1. How unequal are the company weights in the S&P 500?
-2. How much of the index is represented by its largest companies?
-3. What does the Lorenz curve tell us about concentration?
-4. What is the Gini coefficient of the S&P 500 weights?
+1.  How unequal are the company weights in the S&P 500?
+2.  How much of the index is represented by its largest companies?
+3.  What does the Lorenz curve tell us about concentration?
+4.  What is the Gini coefficient of the S&P 500 weights?
+
+## Our Solution
+
+```{r}
+df <- tq_index("SP500")
+
+df
+```
+
+```{r}
+ggplot(df, aes(x = weight)) +
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") 
+```
+
+```{r}
+ggplot(df, aes(x = sector, y = weight)) +
+  geom_violin(fill = "lightblue", color = "black") +
+  geom_boxplot(width = 0.1, color = "darkblue", alpha = 0.5) # Spesso si abbinano per vedere la mediana
+```
+```{r}
+df |>
+  arrange(desc(weight)) |>
+  mutate(id = row_number()) |>
+  ggplot(aes(x = id, y = weight)) +
+  geom_line(color = "steelblue", linewidth = 1)
+  
+```
+
 
