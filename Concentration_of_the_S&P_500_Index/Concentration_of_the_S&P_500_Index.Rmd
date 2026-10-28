@@ -38,6 +38,8 @@ Our main questions are:
 
 ## Our Solution
 
+### 1.
+
 ```{r}
 df <- tq_index("SP500")
 
@@ -63,4 +65,45 @@ df |>
   
 ```
 
+### 2.
+
+```{r}
+df_order <- df |>
+  arrange(desc(weight)) |>
+  mutate(id = row_number()) 
+
+df_order |>
+  ggplot(aes(x = id, y = cumsum(weight))) +
+  geom_line(color = "steelblue", linewidth = 1) 
+
+df |>
+  arrange(desc(weight)) |>
+  mutate(
+    n_company = row_number(), 
+    peso_cumulativo = cumsum(weight)
+  ) |>
+  select(n_company, peso_cumulativo) |>
+  filter(n_company == 10 |  n_company == 20 | n_company == 30)
+```
+Come si può notare le prime aziende comprendono la maggior parte del peso: 38% è solo dei primi 10, fino ad arrivare al 52% che è dei primi 30 su 501.
+
+### 3. 
+
+```{r}
+curva_lorenz <- Lc(df$weight)
+
+plot(curva_lorenz, col = "steelblue", lwd = 2, main = "Curva di Lorenz - S&P 500", xlab = "Company percent", ylab = "Cumulative percent of weight")
+```
+
+Si nota la retta obliqua che rappresenta come dovrebbe essere la distribuzione omogenea dei pesi delle aziende. Si nota che la curva sta fin dall'inzio sotto la diagonale con un impennata finale. Questo vuol dire che la distribuzione è molto sbilanciata verso destra e sapendo che le aziende vengono ordinate, in base al peso in modo crescente, in automatico dalla funzione Lc.
+
+### 4. 
+
+```{r}
+valore_gini <- ineq(df$weight, type = "Gini")
+
+print(valore_gini)
+```
+
+Il coefficiente di Gini misura con un valore compreso fra 0 e 1 quanto è distribuita una variabile. Lo 0 rappresenta la distribuzione perfetta (omogenea), l'1 invece l'opposto ovvero che tutti hanno 0 tranne un singolo elemento che ha tutto. In questo caso il valore del gini del peso è di 0.7 che vuol dire che è molto sbilanciata: ci sono poche aziende con tanto peso e tante con poco (esattamente come mostra la curva).
 
