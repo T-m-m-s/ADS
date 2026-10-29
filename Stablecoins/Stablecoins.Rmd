@@ -9,31 +9,171 @@ knitr::opts_chunk$set(cache = TRUE, message = FALSE)
 
 We want to compare three major Ethereum stablecoins:
 
--  USDC (smart contract address: 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48)
--  USDT (smart contract address: 0xdac17f958d2ee523a2206206994597c13d831ec7)
--  DAI (smart contract address: 0x6b175474e89094c44da98b954eedeac495271d0f)
-
+- USDC (smart contract address: 0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48)
+- USDT (smart contract address: 0xdac17f958d2ee523a2206206994597c13d831ec7)
+- DAI (smart contract address: 0x6b175474e89094c44da98b954eedeac495271d0f)
 
 We will investigate two questions:
 
-1. How do their transfer sizes differ?
-2. How much transfer volume does each stablecoin generate?
+1.  How do their transfer sizes differ?
+2.  How much transfer volume does each stablecoin generate?
 
 Our workflow is:
 
-```text
+``` text
 Ethereum
-   â†“
+   ↓
 Etherscan
-   â†“
+   ↓
 ERC-20 transfer events
-   â†“
+   ↓
 R / tidyverse
-   â†“
+   ↓
 transfer sizes + transfer volumes
 ```
 
-We use Etherscan to retrieve the already indexed ERC-20 transfer events. Etherscanâ€™s `tokentx` endpoint can be filtered directly by token contract, so we do not need to download unrelated ERC-20 transfers first. 
+We use Etherscan to retrieve the already indexed ERC-20 transfer events. Etherscanâ€™s `tokentx` endpoint can be filtered directly by token contract, so we do not need to download unrelated ERC-20 transfers first.
 
 We use the term transfer rather than transaction throughout the lab: one Ethereum transaction can generate several ERC-20 transfer events.
+
+## Our solution
+
+```{r}
+readRenviron(".Renviron")
+api_key <- Sys.getenv("ETHERSCAN_API_KEY")
+```
+
+```{r}
+library(tidyverse)
+library(httr2)
+
+addUSDC <- "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48"
+addUSDT <- "0xdac17f958d2ee523a2206206994597c13d831ec7"
+addDAI <- "0x6b175474e89094c44da98b954eedeac495271d0f"
+```
+
+Richieste:
+
+```{r}
+r_USDC <- request("https://api.etherscan.io/v2/api") |>
+  req_url_query(
+    chainid = 1,
+    module = "account",
+    action = "tokentx",
+    contractaddress = addUSDC,
+    startblock = 0,
+    endblock = 99999999,
+    page = 1,
+    offset = 1000,
+    sort = "asc",
+    apikey = api_key
+  ) |>
+  req_perform() |>
+  resp_body_json(simplifyVector = TRUE)
+
+r_USDT <- request("https://api.etherscan.io/v2/api") |>
+  req_url_query(
+    chainid = 1,
+    module = "account",
+    action = "tokentx",
+    contractaddress = addUSDT,
+    startblock = 0,
+    endblock = 99999999,
+    page = 1,
+    offset = 1000,
+    sort = "asc",
+    apikey = api_key
+  ) |>
+  req_perform() |>
+  resp_body_json(simplifyVector = TRUE)
+
+r_DAI <- request("https://api.etherscan.io/v2/api") |>
+  req_url_query(
+    chainid = 1,
+    module = "account",
+    action = "tokentx",
+    contractaddress = addDAI,
+    startblock = 0,
+    endblock = 99999999,
+    page = 1,
+    offset = 1000,
+    sort = "asc",
+    apikey = api_key
+  ) |>
+  req_perform() |>
+  resp_body_json(simplifyVector = TRUE)
+
+write_rds(r_USDC, "r_USDC.rds")
+write_rds(r_USDT, "r_USDT.rds")
+write_rds(r_DAI, "r_DAI.rds")
+```
+
+Dataframe:
+
+```{r}
+df_USDC <- read_rds("r_USDC.rds")
+df_USDT <- read_rds("r_USDT.rds")
+df_DAI <- read_rds("r_DAI.rds")
+
+df_USDC <- df_USDC$result |>
+  mutate(value = as.numeric(value)/10^6)
+df_USDT <- df_USDT$result |>
+  mutate(value = as.numeric(value)/10^6)
+df_DAI <- df_DAI$result |>
+  mutate(value = as.numeric(value)/10^18)
+
+df_USDC
+df_USDT
+df_DAI
+```
+
+### 1. 
+
+Noi vogliamo vedere quanto differiscono i transfer size fra le diverse stablecoin:
+
+Per ognuno studiamo alcune cose:
+
+```{r}
+data.frame(
+  name = c("USDC", "USDT", "DAI"),
+  mean_size = c(
+    mean(df_USDC$value, na.rm = TRUE),
+    mean(df_USDT$value, na.rm = TRUE),
+    mean(df_DAI$value, na.rm = TRUE)
+  ),
+  median = c(
+    median(df_USDC$value, na.rm = TRUE),
+    median(df_USDT$value, na.rm = TRUE),
+    median(df_DAI$value, na.rm = TRUE)
+  )
+)
+```
+
+```{r}
+df_totale <- bind_rows(df_USDC, df_USDT, df_DAI)
+
+df_totale |>
+  filter(value > 0) |>
+  ggplot(aes(x = tokenSymbol, y = value, fill = tokenSymbol)) +
+  geom_boxplot() +
+  scale_y_log10() +
+  labs(
+    title = "Confronto dei Transfer Size (Senza zeri)",
+    x = "Token",
+    y = "Transfer Size (USD, scala log10)"
+  ) 
+```
+
+Si può notare che USDT registra la mediana più elevata e una maggiore concentrazione di trasferimenti su importi alti, seguito da USDC, mentre DAI presenta valori tipici inferiori. Tutti i token mostrano una forte asimmetria con numerosi outlier verso l'alto, evidenziando la presenza di transazioni di grande entità.
+
+### 2. 
+
+```{r}
+df_totale |> 
+  group_by(tokenSymbol) |> 
+  summarise(transfer_volume_tot = sum(value, na.rm = TRUE))
+```
+
+To calculate the transfer volume for each stablecoin, we compute the cumulative sum of all transfer amounts grouped by token. The results show that USDT generates the highest overall transfer volume, followed by USDT and than DAI, reflecting their relative economic activity and liquidity usage on the network.
+
 
