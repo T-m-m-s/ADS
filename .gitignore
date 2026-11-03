@@ -9,3 +9,6 @@
 .claude/
 CLAUDE.md
 CLAUDE.local.md
+
+# secrets
+.Renviron
