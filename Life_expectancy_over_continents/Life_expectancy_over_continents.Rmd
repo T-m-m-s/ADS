@@ -1,0 +1,8 @@
+
+How life expectancy change over time for each continent?
+
+Life expectancy for a country is the mean length of life over people of a country. Using variables life expectancy and population of a country:
+
+    derive a formula to compute life expectancy of a continent (a group of countries)
+    plot how life expectancy changed over time for each continent
+    do the same for the whole planet
