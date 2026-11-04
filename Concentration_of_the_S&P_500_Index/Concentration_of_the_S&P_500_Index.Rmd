@@ -48,22 +48,20 @@ df
 
 ```{r}
 ggplot(df, aes(x = weight)) +
-  geom_histogram(bins = 30, fill = "steelblue", color = "white") 
+  geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  labs(title = "Distribution of S&P 500 weights", x = "Weight", y = "Companies")
 ```
 
-```{r}
-ggplot(df, aes(x = sector, y = weight)) +
-  geom_violin(fill = "lightblue", color = "black") +
-  geom_boxplot(width = 0.1, color = "darkblue", alpha = 0.5) # Spesso si abbinano per vedere la mediana
-```
 ```{r}
 df |>
   arrange(desc(weight)) |>
   mutate(id = row_number()) |>
   ggplot(aes(x = id, y = weight)) +
-  geom_line(color = "steelblue", linewidth = 1)
-  
+  geom_line(color = "steelblue", linewidth = 1) +
+  labs(title = "Weight by company rank", x = "Rank", y = "Weight")
 ```
+
+The weights are very unequal. With about 500 companies, equal weighting would give each company about 0.2%. The histogram shows that almost all companies have a tiny weight, close to zero, and only a few have a much larger one: the median weight is about 0.07%, while the largest company (Apple) has about 7.6%, more than 100 times the median. The ranked plot confirms this: the weight drops sharply over the first few companies and then flattens into a long tail of small weights. The distribution is therefore strongly right-skewed.
 
 ### 2.
 
@@ -74,36 +72,37 @@ df_order <- df |>
 
 df_order |>
   ggplot(aes(x = id, y = cumsum(weight))) +
-  geom_line(color = "steelblue", linewidth = 1) 
+  geom_line(color = "steelblue", linewidth = 1) +
+  labs(title = "Cumulative weight of top companies", x = "Rank", y = "Cumulative weight")
 
 df |>
   arrange(desc(weight)) |>
   mutate(
     n_company = row_number(), 
-    peso_cumulativo = cumsum(weight)
+    cumulative_weight = cumsum(weight)
   ) |>
-  select(n_company, peso_cumulativo) |>
-  filter(n_company == 10 |  n_company == 20 | n_company == 30)
+  select(n_company, cumulative_weight) |>
+  filter(n_company %in% c(10, 20, 30))
 ```
-Come si può notare le prime aziende comprendono la maggior parte del peso: 38% è solo dei primi 10, fino ad arrivare al 52% che è dei primi 30 su 501.
+A small number of companies carries a large share of the index: the top 10 companies alone account for about 37% of the total weight, the top 20 for about 48% and the top 30 for about 54%, out of roughly 500 constituents. The exact figures change slightly over time because the constituents and weights are retrieved live.
 
 ### 3. 
 
 ```{r}
-curva_lorenz <- Lc(df$weight)
+lorenz_curve <- Lc(df$weight)
 
-plot(curva_lorenz, col = "steelblue", lwd = 2, main = "Curva di Lorenz - S&P 500", xlab = "Company percent", ylab = "Cumulative percent of weight")
+plot(lorenz_curve, col = "steelblue", lwd = 2, main = "Lorenz curve - S&P 500 weights", xlab = "Company percent", ylab = "Cumulative percent of weight")
 ```
 
-Si nota la retta obliqua che rappresenta come dovrebbe essere la distribuzione omogenea dei pesi delle aziende. Si nota che la curva sta fin dall'inzio sotto la diagonale con un impennata finale. Questo vuol dire che la distribuzione è molto sbilanciata verso destra e sapendo che le aziende vengono ordinate, in base al peso in modo crescente, in automatico dalla funzione Lc.
+The diagonal line shows perfect equality, where every company has the same weight. The function `Lc` sorts the companies by weight in increasing order, so the curve shows the cumulative share of weight held by the smallest companies. The curve lies far below the diagonal and only rises steeply at the very end: the smaller half of the companies holds only about 9% of the total weight, while the largest 10% holds about 63%. The weights are therefore highly concentrated in a few large companies.
 
 ### 4. 
 
 ```{r}
-valore_gini <- ineq(df$weight, type = "Gini")
+gini_value <- ineq(df$weight, type = "Gini")
 
-print(valore_gini)
+print(gini_value)
 ```
 
-Il coefficiente di Gini misura con un valore compreso fra 0 e 1 quanto è distribuita una variabile. Lo 0 rappresenta la distribuzione perfetta (omogenea), l'1 invece l'opposto ovvero che tutti hanno 0 tranne un singolo elemento che ha tutto. In questo caso il valore del gini del peso è di 0.7 che vuol dire che è molto sbilanciata: ci sono poche aziende con tanto peso e tante con poco (esattamente come mostra la curva).
+The Gini coefficient measures, on a scale from 0 to 1, how unequally a variable is distributed. A value of 0 means perfect equality (all companies have the same weight), while 1 means maximum inequality (a single company holds all the weight and the others have none). Here the Gini coefficient of the weights is about 0.71, which indicates strong concentration: a few companies have a large weight and many have a very small one, as the Lorenz curve also shows.
 
