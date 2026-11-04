@@ -1,0 +1,114 @@
+---
+title: "How life expectancy change over time for each continent?"
+output:
+  html_document:
+    theme: spacelab
+    highlight: pygments
+---
+
+```{r setup, include=FALSE}
+# cache results
+knitr::opts_chunk$set(cache=TRUE, message=FALSE)
+```
+
+Life expectancy for a country is the mean length of life over people of a country. Using variables life expectancy and population of a country:
+
+1.  derive a formula to compute life expectancy of a continent (a group of countries)
+2.  plot how life expectancy changed over time for each continent
+3.  do the same for the whole planet
+
+## Our solution
+
+### 1. 
+
+$$
+LE_C = \frac{\sum_{y}\sum_{c \ \in \ C} LE_{c,y}\cdot pop_{c,y}}{\sum_{y}\sum_{c \ \in \ C} pop_{c,y}} \qquad y = year, c = country, C = continent
+$$
+
+
+```{r}
+library(gapminder)
+library(dplyr)
+library(ggplot2)
+library(shiny)
+
+gap_y <- gapminder |>
+  group_by(continent, year) |>
+  summarise(
+    pop_tot_y = sum(pop),
+    lifeExpC_y = sum(lifeExp * pop) / pop_tot_y
+  ) 
+
+gap_y |>
+  select(-pop_tot_y)
+
+
+gap_y |>
+  summarise(
+    lifeExpC = sum(lifeExpC_y * pop_tot_y) / sum(pop_tot_y)
+  )
+```
+
+Using non-weighted mean:
+
+```{r}
+
+gap_y |>
+  summarise(
+    lifeExpC = mean(lifeExpC_y)
+  )
+```
+
+
+### 2.
+
+```{r}
+gap_y |>
+  select(-pop_tot_y) |>
+  ggplot(aes(x = year, y = lifeExpC_y, group = continent, color = continent)) +
+  geom_line(alpha = 0.6, linewidth = 0.8) +
+  labs(
+    title = "Evoluzione dell'Aspettativa di Vita per Paese",
+    subtitle = "Dataset Gapminder",
+    x = "Anno",
+    y = "Aspettativa di Vita (anni)",
+    color = "Continente"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+gap_p_y <- gapminder |>
+  group_by(year) |>
+  summarise(
+    pop_tot_p_y = sum(pop),
+    lifeExp_p_y = sum(lifeExp * pop) / pop_tot_p_y
+  ) 
+
+gap_p_y
+
+gap_p_y |>
+  summarise(
+    lifeExp_p = sum(lifeExp_p_y * pop_tot_p_y) / sum(pop_tot_p_y)
+  ) |>
+  mutate(
+    Planet = c("Earth")
+  ) |>
+  select(Planet, lifeExp_p)
+```
+
+```{r}
+gap_p_y |>
+  select(-pop_tot_p_y) |>
+  ggplot(aes(x = year, y = lifeExp_p_y, color = c("Earth"))) +
+  geom_line(alpha = 0.6, linewidth = 0.8) +
+  labs(
+    title = "Evoluzione dell'Aspettativa di Vita per Paese",
+    subtitle = "Dataset Gapminder",
+    x = "Anno",
+    y = "Aspettativa di Vita (anni)",
+    color = "Planet"
+  ) +
+  theme_minimal()
+```
+
