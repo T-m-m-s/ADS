@@ -53,13 +53,6 @@ ggplot(df, aes(x = weight)) +
 ```
 
 ```{r}
-ggplot(df, aes(x = sector, y = weight)) +
-  geom_violin(fill = "lightblue", color = "black") +
-  geom_boxplot(width = 0.1, color = "darkblue", alpha = 0.5) + # the boxplot adds the median and quartiles to the violin
-  labs(title = "Weights by sector", x = "Sector", y = "Weight") +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-```{r}
 df |>
   arrange(desc(weight)) |>
   mutate(id = row_number()) |>
@@ -67,6 +60,8 @@ df |>
   geom_line(color = "steelblue", linewidth = 1) +
   labs(title = "Weight by company rank", x = "Rank", y = "Weight")
 ```
+
+The weights are very unequal. With about 500 companies, equal weighting would give each company about 0.2%. The histogram shows that almost all companies have a tiny weight, close to zero, and only a few have a much larger one: the median weight is about 0.07%, while the largest company (Apple) has about 7.6%, more than 100 times the median. The ranked plot confirms this: the weight drops sharply over the first few companies and then flattens into a long tail of small weights. The distribution is therefore strongly right-skewed.
 
 ### 2.
 
@@ -89,7 +84,7 @@ df |>
   select(n_company, cumulative_weight) |>
   filter(n_company %in% c(10, 20, 30))
 ```
-A small number of companies carries a large share of the index: the top 10 companies alone account for about 37% of the total weight, the top 20 for about 49% and the top 30 for about 55%, out of roughly 500 constituents. The exact figures change slightly over time because the constituents and weights are retrieved live.
+A small number of companies carries a large share of the index: the top 10 companies alone account for about 37% of the total weight, the top 20 for about 48% and the top 30 for about 54%, out of roughly 500 constituents. The exact figures change slightly over time because the constituents and weights are retrieved live.
 
 ### 3. 
 
