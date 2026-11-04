@@ -145,11 +145,49 @@ df_all |>
   labs(
     title = "Transfer size comparison (zero-value transfers excluded)",
     x = "Token",
-    y = "Transfer Size (USD, scala log10)"
+    y = "Transfer Size (USD, log10 scale)"
   ) 
 ```
 
-In the analysed window USDC has the highest median transfer size (about 900 USD, zero-value transfers excluded), followed by DAI (about 830 USD), while USDT has the lowest (about 490 USD). All three distributions are strongly right-skewed: the mean is far above the median and there are many large outliers, up to millions of USD. DAI has only 138 transfers in the window, so its statistics are less reliable than those of USDC and USDT. These results describe a short window of blocks, not the whole history of the tokens.
+The same boxplot on the raw scale (zero-value transfers excluded):
+
+```{r}
+df_all |>
+  filter(value > 0) |>
+  ggplot(aes(x = tokenSymbol, y = value, fill = tokenSymbol)) +
+  geom_boxplot() +
+  labs(
+    title = "Transfer size comparison, raw scale (zero-value transfers excluded)",
+    x = "Token",
+    y = "Transfer Size (USD)"
+  )
+```
+
+
+Histograms of the transfer sizes on the log scale, with the median (solid line) and the mean (dashed line) of each token:
+
+```{r}
+df_pos <- df_all |>
+  filter(value > 0)
+
+stats <- df_pos |>
+  group_by(tokenSymbol) |>
+  summarise(
+    mean_value = mean(value),
+    median_value = median(value)
+  )
+
+ggplot(df_pos, aes(x = value, fill = tokenSymbol)) +
+  geom_histogram(bins = 40, show.legend = FALSE) +
+  scale_x_log10() +
+  facet_wrap(~tokenSymbol, ncol = 1, scales = "free_y") +
+  geom_vline(data = stats, aes(xintercept = median_value)) +
+  geom_vline(data = stats, aes(xintercept = mean_value), linetype = "dashed") +
+  labs(x = "Transfer Size (USD, log10 scale)", y = "Transfers")
+```
+
+
+USDC has the highest median transfer size (about 900 USD), then DAI (about 830), while USDT has the lowest (about 490). All three are right-skewed: on the raw scale the boxes are squashed near zero because of a few outliers reaching millions of USD, and the mean is far above the median. On the log scale the boxes look roughly symmetric, and USDC and USDT have outliers at both ends (tiny transfers and huge ones). The histograms show the same thing: bell-shaped on the log scale, with the mean (dashed) far to the right of the median (solid), because a few huge transfers pull the mean up. DAI looks irregular because it has only 138 transfers, so its numbers are less reliable. This is just a short window of blocks, not the whole history of the tokens.
 
 ### 2. 
 
