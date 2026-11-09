@@ -32,50 +32,81 @@ diamonds
 ```{r}
 ggplot(diamonds, aes(x = cut, y = price, fill = cut)) +
   geom_boxplot(alpha = 0.6, outlier.alpha = 0.1) +
-  # Aggiunge un punto chiaro per evidenziare la mediana
+  # Red point highlights the median
   stat_summary(fun = median, geom = "point", color = "darkred", size = 3) +
   labs(
-    title = "Distribuzione del Prezzo per Qualità del Taglio",
-    subtitle = "I punti rossi indicano la mediana esatta del prezzo",
-    x = "Qualità del Taglio (Cut)",
-    y = "Prezzo ($)"
+    title = "Price distribution by Cut quality",
+    subtitle = "Red points mark the median price",
+    x = "Cut quality (cut)",
+    y = "Price ($)"
   ) +
   theme_minimal() +
   theme(legend.position = "none")
 
 ggplot(diamonds, aes(x = color, y = price, fill = color)) +
   geom_boxplot(alpha = 0.6, outlier.alpha = 0.1) +
-  # Aggiunge un punto chiaro per evidenziare la mediana
+  # Red point highlights the median
   stat_summary(fun = median, geom = "point", color = "darkred", size = 3) +
   labs(
-    title = "Distribuzione del Prezzo per Qualità del Taglio",
-    subtitle = "I punti rossi indicano la mediana esatta del prezzo",
-    x = "Qualità del Taglio (Cut)",
-    y = "Prezzo ($)"
+    title = "Price distribution by Color quality",
+    subtitle = "Red points mark the median price",
+    x = "Color quality (color)",
+    y = "Price ($)"
   ) +
   theme_minimal() +
   theme(legend.position = "none")
 
 ggplot(diamonds, aes(x = clarity, y = price, fill = clarity)) +
   geom_boxplot(alpha = 0.6, outlier.alpha = 0.1) +
-  # Aggiunge un punto chiaro per evidenziare la mediana
+  # Red point highlights the median
   stat_summary(fun = median, geom = "point", color = "darkred", size = 3) +
   labs(
-    title = "Distribuzione del Prezzo per Qualità del Taglio",
-    subtitle = "I punti rossi indicano la mediana esatta del prezzo",
-    x = "Qualità del Taglio (Cut)",
-    y = "Prezzo ($)"
+    title = "Price distribution by Clarity quality",
+    subtitle = "Red points mark the median price",
+    x = "Clarity quality (clarity)",
+    y = "Price ($)"
   ) +
   theme_minimal() +
   theme(legend.position = "none")
 ```
+
+For all three variables the cheaper diamonds are often the better ones. Ideal diamonds have a lower median price than Fair ones, color J (the worst) is more expensive than D (the best), and clarity IF (the best) is among the cheapest. The median price of clarity I1 (the worst) is about 3300 while IF has about 1100. Something else must drive the price. A natural candidate is the weight of the diamond, `carat`: the table below shows the average price and carat for each cut.
+
 ```{r}
 diamonds |>
   group_by(cut) |>
   summarise(
-    prezzo_medio = mean(price),
-    carati_medi = mean(carat),
-    chiarezza_
+    mean_price = mean(price),
+    mean_carat = mean(carat),
+    mean_clarity = mean(as.integer(clarity))  # 1 = I1 (worst) ... 8 = IF (best)
   )
 ```
 
+The pattern is the same: Fair diamonds are on average the heaviest (1.05 carat) and Ideal ones the lightest (0.70 carat), and the price follows the weight. Bigger diamonds are rarer and more expensive, but they are also harder to cut well, so they tend to have a worse cut, color and clarity. This is a confounding effect: quality looks negatively associated with price only because it is negatively associated with carat.
+
+### 2.
+
+We fit a model for the log of the price (price grows roughly exponentially with size, and the log makes the relation linear) using only the quality variables. The coefficients are the differences with respect to the worst level (Fair, J, I1).
+
+```{r}
+diamonds_f <- diamonds |>
+  mutate(
+    cut = relevel(factor(cut, ordered = FALSE), "Fair"),
+    color = relevel(factor(color, ordered = FALSE), "J"),
+    clarity = relevel(factor(clarity, ordered = FALSE), "I1")
+  )
+
+model_quality <- lm(log(price) ~ cut + color + clarity, data = diamonds_f)
+round(coef(model_quality), 2)
+summary(model_quality)$r.squared
+```
+
+Without `carat` the model reproduces the paradox: the coefficients of the best cut (Ideal, -0.26) and of the best colors (D and E, about -0.5) are negative, meaning cheaper than the worst level. Also, the model explains only 8% of the variability of the price. Now we add `carat`, also on log scale:
+
+```{r}
+model_carat <- lm(log(price) ~ log(carat) + cut + color + clarity, data = diamonds_f)
+round(coef(model_carat), 2)
+summary(model_carat)$r.squared
+```
+
+Once the weight is taken into account the paradox disappears, and the model explains 98% of the variability. All the quality coefficients now have the expected sign and grow with quality: Ideal is about 17% more expensive than Fair (`exp(0.16)`) with the same carat, color D is about 67% more expensive than J (`exp(0.51)`) and clarity IF about three times more expensive than I1 (`exp(1.11)`). The coefficient of `log(carat)` is 1.88: a 1% heavier diamond is about 1.9% more expensive. So, at equal weight, better quality means higher price. Low quality diamonds looked more expensive only because they are bigger.
