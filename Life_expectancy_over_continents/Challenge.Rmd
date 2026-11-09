@@ -19,63 +19,55 @@ Life expectancy for a country is the mean length of life over people of a countr
 
 ## Our solution
 
-### 1. 
+### 1.
+
+The life expectancy of a continent in a given year is the mean of the life expectancies of its countries, weighted by population: a populous country counts more because it contains more people.
 
 $$
-LE_C = \frac{\sum_{y}\sum_{c \ \in \ C} LE_{c,y}\cdot pop_{c,y}}{\sum_{y}\sum_{c \ \in \ C} pop_{c,y}} \qquad y = year, c = country, C = continent
+LE_{C,y} = \frac{\sum_{c \ \in \ C} LE_{c,y}\cdot pop_{c,y}}{\sum_{c \ \in \ C} pop_{c,y}} \qquad y = year, c = country, C = continent
 $$
-
 
 ```{r}
 library(gapminder)
 library(dplyr)
 library(ggplot2)
-library(shiny)
 
 gap_y <- gapminder |>
   group_by(continent, year) |>
   summarise(
     pop_tot_y = sum(pop),
     lifeExpC_y = sum(lifeExp * pop) / pop_tot_y
-  ) 
+  )
 
 gap_y |>
   select(-pop_tot_y)
-
-
-gap_y |>
-  summarise(
-    lifeExpC = sum(lifeExpC_y * pop_tot_y) / sum(pop_tot_y)
-  )
 ```
-
-Using non-weighted mean:
-
-```{r}
-
-gap_y |>
-  summarise(
-    lifeExpC = mean(lifeExpC_y)
-  )
-```
-
 
 ### 2.
 
 ```{r}
 gap_y |>
-  select(-pop_tot_y) |>
   ggplot(aes(x = year, y = lifeExpC_y, group = continent, color = continent)) +
   geom_line(alpha = 0.6, linewidth = 0.8) +
   labs(
-    title = "Evoluzione dell'Aspettativa di Vita per Paese",
-    subtitle = "Dataset Gapminder",
-    x = "Anno",
-    y = "Aspettativa di Vita (anni)",
-    color = "Continente"
+    title = "Life expectancy over time for each continent",
+    subtitle = "Gapminder dataset, population-weighted",
+    x = "Year",
+    y = "Life expectancy (years)",
+    color = "Continent"
   ) +
   theme_minimal()
 ```
+
+All continents gain years of life over time, but with different speeds. Oceania and Europe start high (69 and 65 years in 1952) and reach 81 and 78 in 2007. Asia is the one that grows the most, from 43 to 69 years (+26), and it closes most of the gap with the Americas (from 60 to 75). Africa starts lowest (39 years) and ends lowest (55), and its growth slows down after the 1980s. The gap between the best and the worst continent is about 30 years in 1952 and still about 27 in 2007.
+
+### 3.
+
+The same formula applies to the whole planet: group all countries together.
+
+$$
+LE_{y} = \frac{\sum_{c} LE_{c,y}\cdot pop_{c,y}}{\sum_{c} pop_{c,y}}
+$$
 
 ```{r}
 gap_p_y <- gapminder |>
@@ -83,32 +75,23 @@ gap_p_y <- gapminder |>
   summarise(
     pop_tot_p_y = sum(pop),
     lifeExp_p_y = sum(lifeExp * pop) / pop_tot_p_y
-  ) 
-
-gap_p_y
+  )
 
 gap_p_y |>
-  summarise(
-    lifeExp_p = sum(lifeExp_p_y * pop_tot_p_y) / sum(pop_tot_p_y)
-  ) |>
-  mutate(
-    Planet = c("Earth")
-  ) |>
-  select(Planet, lifeExp_p)
+  select(-pop_tot_p_y)
 ```
 
 ```{r}
 gap_p_y |>
-  select(-pop_tot_p_y) |>
-  ggplot(aes(x = year, y = lifeExp_p_y, color = c("Earth"))) +
-  geom_line(alpha = 0.6, linewidth = 0.8) +
+  ggplot(aes(x = year, y = lifeExp_p_y)) +
+  geom_line(color = "steelblue", linewidth = 0.8) +
   labs(
-    title = "Evoluzione dell'Aspettativa di Vita per Paese",
-    subtitle = "Dataset Gapminder",
-    x = "Anno",
-    y = "Aspettativa di Vita (anni)",
-    color = "Planet"
+    title = "Life expectancy over time for the whole planet",
+    subtitle = "Gapminder dataset, population-weighted",
+    x = "Year",
+    y = "Life expectancy (years)"
   ) +
   theme_minimal()
 ```
 
+Life expectancy of the planet grows steadily from about 49 years in 1952 to about 69 in 2007 (+20 years). This is the population-weighted mean: it is dominated by Asia, which contains most of the world population, so the planet curve follows the Asian one rather than the African one. For comparison, the simple mean of the countries in 2007 is 67 years, lower than the weighted one (69), because small countries with low life expectancy count as much as the huge ones.
