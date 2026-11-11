@@ -1,0 +1,408 @@
+---
+title: "Global warming through data"
+output:
+  html_document:
+    theme: spacelab
+    highlight: pygments
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(cache = TRUE, message = FALSE)
+```
+
+## Learning objectives
+
+In this lab, we will explore historical global temperature anomalies using the NASA [GISTEMP dataset](https://data.giss.nasa.gov/gistemp/data_v4.html). We will use the `tidyverse` ecosystem to clean, summarize, and visualize climate data, and conclude by creating a simple piece of data art.
+
+## The dataset
+
+We will use the NASA GISS Surface Temperature Analysis (GISTEMP v4), which provides monthly global surface temperature anomalies from 1880 to the present.
+
+An anomaly measures the difference, in degrees Celsius, between an observed temperature and the corresponding average temperature during the reference period 1951â€“1980.
+
+A positive anomaly indicates a warmer-than-average month; a negative anomaly indicates a cooler-than-average month.
+
+The global CSV contains one row per year, twelve monthly columns (`Jan`â€“`Dec`), and additional seasonal and annual summaries.
+
+Dataset: [Download NASA GISTEMP CSV](https://data.giss.nasa.gov/gistemp/tabledata_v4/GLB.Ts+dSST.csv)
+
+## Importing the data
+
+First, load the required library and import the dataset directly from NASA.
+
+```{r}
+
+library(tidyverse)
+
+url <- paste0(
+  "https://data.giss.nasa.gov/gistemp/",
+  "tabledata_v4/GLB.Ts+dSST.csv"
+)
+
+temp_raw <- read_csv(
+  url,
+  skip = 1,
+  na = c("***", "****"),
+  show_col_types = FALSE
+)
+
+glimpse(temp_raw)
+
+```
+
+The result is a wide table: each year is represented by one row, with separate columns for monthly temperature anomalies.
+
+## Tidying the data
+
+For many analyses, it is more convenient to have one observation per row, with separate variables for year, month, and anomaly.
+
+```{r}
+temp <- temp_raw |>
+  select(Year, Jan:Dec) |>
+  pivot_longer(
+    cols = Jan:Dec,
+    names_to = "month",
+    values_to = "anomaly"
+  ) |>
+  mutate(
+    month = factor(month, levels = month.abb),
+    date = as.Date(
+      paste(Year, month, "01", sep = "-"),
+      format = "%Y-%b-%d"
+    )
+  ) |>
+  drop_na(anomaly)
+
+head(temp, n = 12)
+
+```
+
+## Descriptive statistics
+
+### 4.1 Overall distribution
+
+Let's compute basic summary statistics.
+
+```{r}
+
+temp |>
+  summarise(
+    observations = n(),
+    mean_anomaly = mean(anomaly),
+    median_anomaly = median(anomaly),
+    sd_anomaly = sd(anomaly),
+    min_anomaly = min(anomaly),
+    max_anomaly = max(anomaly)
+  )
+
+```
+
+These statistics describe the distribution of monthly anomalies over the entire observation period. Since the series has a strong temporal trend, the overall mean alone does not capture how temperatures have changed.
+
+### 4.2 Comparing decades
+
+We can investigate how the average anomaly has evolved across decades.
+
+```{r}
+
+decades <- temp |>
+  mutate(decade = (Year %/% 10) * 10) |>
+  group_by(decade) |>
+  summarise(
+    mean_anomaly = mean(anomaly),
+    sd_anomaly = sd(anomaly),
+    .groups = "drop"
+  )
+
+decades
+
+```
+
+The most recent decade may be incomplete, so its average should be interpreted accordingly.
+
+## 5. Statistical visualization
+
+### 5.1 The global warming trend
+
+We first visualize the annual mean anomaly.
+
+```{r}
+
+annual <- temp |>
+  group_by(Year) |>
+  summarise(
+    mean_anomaly = mean(anomaly),
+    n_months = n(),
+    .groups = "drop"
+  ) |>
+  filter(n_months == 12) # excludes incomplete years
+
+ggplot(annual, aes(x = Year, y = mean_anomaly)) +
+  geom_line(color = "steelblue", linewidth = 0.6) +
+  geom_smooth(
+    method = "loess",
+    se = FALSE,
+    color = "firebrick"
+  ) +
+  labs(
+    title = "Global Temperature Anomalies",
+    subtitle = "Annual means, 1880â€“present",
+    x = "Year",
+    y = "Temperature anomaly (Â°C)"
+  ) +
+  theme_minimal()
+
+```
+
+### 5.2 Comparing distributions
+
+Next, compare the anomaly distributions across decades.
+
+```{r}
+
+temp |>
+  mutate(decade = (Year %/% 10) * 10) |>
+  ggplot(aes(
+    x = factor(decade),
+    y = anomaly
+  )) +
+  geom_boxplot(show.legend = FALSE) +
+  labs(
+    title = "Temperature Anomalies by Decade",
+    x = "Decade",
+    y = "Temperature anomaly (Â°C)"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1)
+  )
+
+```
+
+## From data visualization to data art
+
+For the final activity, we will create a climate tapestry: a geometric composition in which each tile represents one month, and its color encodes the corresponding temperature anomaly.
+
+### Creating the climate tapestry
+
+```{r}
+ggplot(temp, aes(x = Year, y = month, fill = anomaly)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "#2166AC",
+    mid = "#F7F7F7",
+    high = "#B2182B",
+    midpoint = 0
+  ) +
+  labs(
+    title = "The Fabric of Climate Change",
+    subtitle = "Global monthly temperature anomalies, 1880â€“2025",
+    x = NULL, y = NULL,
+    fill = "Â°C",
+    caption = "NASA GISTEMP v4 | Baseline: 1951â€“1980"
+  ) +
+  theme_minimal() +
+  theme(
+    panel.grid = element_blank(),
+    axis.ticks = element_blank()
+  )
+
+
+```
+
+
+- `ggplot(temp, aes(x = Year, y = month, fill = anomaly))` maps years to the horizontal axis, months to the vertical axis, and temperature anomalies to tile colors.
+- `geom_tile()` creates one rectangular tile for each month-year combination.
+- `scale_fill_gradient2()` defines a diverging color palette: blue for negative anomalies, white for values near zero, and red for positive anomalies. The `midpoint = 0` argument ensures that zero corresponds to the neutral color.
+- `labs()` adds a title, subtitle, legend label, and data source.
+- `theme_void()` removes axes, grid lines, and other graphical elements, emphasizing the artistic composition.
+- `theme()` customizes the remaining visual elements, such as the background, title size, and legend position.
+
+The resulting artwork represents the evolution of global temperatures through color. Each tile corresponds to one month, and the gradual transition from blue to red reveals the long-term warming trend.
+
+### Climate Spiral
+
+Let's create a different piece of data art using the NASA GISTEMP dataset: a Climate Spiral.
+
+Instead of representing temperatures as a rectangular tapestry, we arrange monthly observations along an expanding spiral. Each revolution represents one year, and colors encode temperature anomalies.
+
+The resulting artwork resembles a colorful fingerprint of global warming.
+
+```{r}
+spiral <- temp |>
+  arrange(date) |>
+  mutate(
+    month_number = as.integer(month),
+    angle = 2 * pi * (month_number - 1) / 12,
+    radius = Year - min(Year) + (month_number - 1) / 12,
+    ##radius = max(Year) - Year + (month_number - 1) / 12,
+    x = radius * cos(angle),
+    y = radius * sin(angle)
+  )
+
+ggplot(spiral, aes(
+  x = x,
+  y = y,
+  color = anomaly
+)) +
+  geom_path(linewidth = 1.2) +
+  coord_equal() +
+  scale_color_gradient2(
+    low = "#2166AC",
+    mid = "#F7F7F7",
+    high = "#B2182B",
+    midpoint = 0
+  ) +
+  labs(
+    title = "The Climate Spiral",
+    subtitle = expression(
+      "Global temperature anomalies, 1880â€“present"
+    ),
+    color = "Temperature anomaly (Â°C)",
+    caption = "Source: NASA GISTEMP v4"
+  ) +
+  theme_void()
+
+```
+
+
+- `month_number` converts the month into an integer between 1 and 12.
+- `angle` determines the angular position of each month. The twelve months are distributed around a full circle.
+- `radius` increases continuously over time. Each complete revolution corresponds to one year.
+- `x` and `y` convert polar coordinates into Cartesian coordinates using sine and cosine.
+- `geom_path()` connects observations in chronological order.
+- `coord_equal()` preserves the circular geometry.
+- `scale_color_gradient2()` maps negative anomalies to blue, zero to white, and positive anomalies to red.
+
+Unlike a conventional time-series plot, the spiral visually emphasizes the cumulative passage of time. The older observations are near the center, while recent observations appear at the outer edge.
+
+The temperature anomaly determines the color, not the distance from the center.
+
+One caveat: this is an artistic visualization, not a precise statistical chart. The tightly packed revolutions can make individual observations difficult to distinguish. The accompanying documentation should therefore explain how the visual properties map to the data.
+
+## Climate Flower Garden
+
+The third and final data art visualization is something different from both the climate tapestry and the climate spiral: a Climate Flower Garden.
+
+Each year becomes a flower with twelve petals, one for each month. The color of each petal represents the temperature anomaly, while its length also depends on the anomaly. As the years progress, the garden gradually changes from blue to red.
+
+
+```{r}
+
+library(tidyverse)
+
+flowers <- temp |>
+  filter(between(Year, 1960, 2025)) |>
+  mutate(
+    month_number = match(as.character(month), month.abb),
+    angle = 2 * pi * (month_number - 1) / 12,
+    cx = (Year - 1960) %% 10 + 1,
+    cy = -((Year - 1960) %/% 10),
+    # radius = 0.42,
+    radius = scales::rescale(
+      anomaly,
+      to = c(0.18, 0.42),
+      from = range(temp$anomaly, na.rm = TRUE)
+    ),
+    x = cx + 0.08 * cos(angle),
+    y = cy + 0.08 * sin(angle),
+    xend = cx + radius * cos(angle),
+    yend = cy + radius * sin(angle)
+  )
+
+labels <- flowers |>
+  distinct(Year, cx, cy)
+
+ggplot(flowers) +
+  geom_segment(
+    aes(
+      x = x, y = y,
+      xend = xend, yend = yend,
+      color = anomaly
+    ),
+    linewidth = 1.8,
+    lineend = "round"
+  ) +
+  geom_point(
+    aes(x = cx, y = cy),
+    color = "grey30",
+    size = 0.7
+  ) +
+  geom_text(
+    data = labels,
+    aes(x = cx, y = cy - 0.52, label = Year),
+    size = 2.3,
+    color = "grey40"
+  ) +
+  coord_equal() +
+  scale_color_gradient2(
+    low = "#2166AC",
+    mid = "#F7F7F7",
+    high = "#B2182B",
+    midpoint = 0,
+    guide = "none"
+  ) +
+  labs(
+    title = "The Climate Flower Garden",
+    subtitle = expression(
+      "Monthly global temperature anomalies ("*degree*C*")"
+    ),
+    caption = "NASA GISTEMP v4 | 1960â€“2025"
+  ) +
+  theme_void()
+
+```
+
+
+
+- `filter()` selects the years 1960â€“2025, creating a manageable garden of 66 flowers.
+- `month_number` identifies each month with an integer from 1 to 12.
+- `angle` places the twelve petals at equally spaced angles around a circle.
+- `cx` and `cy` determine the center of each flower, arranging years in rows of ten.
+- `radius` maps temperature anomalies to petal lengths using `scales::rescale()`. Higher anomalies produce longer petals.
+- `x`, `y`, `xend`, and `yend` compute the Cartesian coordinates of the beginning and end of each petal.
+- `geom_segment()` draws the petals, with color determined by the temperature anomaly.
+- `geom_point()` adds a small dot at the center of each flower.
+- `geom_text()` labels each flower with its year.
+- `coord_equal()` preserves the radial geometry.
+- `theme_void()` removes the usual statistical-chart elements.
+
+The color palette uses blue for negative anomalies and red for positive anomalies. Petal lengths are scaled over the full historical dataset, making them comparable across years.
+
+Unlike the climate tapestry, which emphasizes continuous chronological patterns, the flower garden highlights the seasonal structure of the data and allows viewers to compare individual years.
+
+The expected visual transformation is striking: older flowers tend to contain more blue petals, while recent flowers become predominantly red.
+
+## Final reflection
+
+1. How does data art differ from conventional statistical visualization? 
+2. Can an artistic representation communicate aspects of climate change more effectively than a traditional chart? 
+3. What information might be lost in the process?
+4. Do you see any bias in any of the three data artworks? How can you avoid it?
+
+The goal of this lab is not only to analyze climate data, but also to explore how visual design can transform quantitative evidence into a compelling narrative.
+
+
+
+## Creative challenge
+
+Design your own piece of climate data art using the same dataset.
+
+You are free to experiment with geometric shapes, color palettes, transparency, repetition, coordinate transformations, and visual composition.
+
+Create an original visualization using `ggplot2` and the NASA GISTEMP dataset.
+
+Your artwork should satisfy three requirements:
+
+1. It must be generated programmatically from the dataset, rather than manually illustrated.
+2. At least one visual property (color, size, position, shape, or opacity) must encode a numerical variable.
+3. The visual composition must communicate a meaningful aspect of global warming.
+
+You may remove conventional statistical elements such as axes, titles, legends, and labels, but you must document how the data are mapped to the artwork.
+
+### Delivery
+
+Create a new folder on your GitHub repo and add:
+
+1. an R markdown document and its rendering in HTML including the code and an explanation on how the artwork has been generated;
+2. the image (PNG or JPEG) of the artwork
