@@ -587,6 +587,59 @@ is not above G), but the trend is now the expected one. The weight is
 therefore the confounding variable: low quality diamonds looked more
 expensive only because they are bigger, and a bigger diamond costs much
 more.</p>
+<div id="using-models" class="section level4">
+<h4>Using models</h4>
+<p>The same conclusion can be reached with a model, which uses all the
+diamonds instead of only the ones of about 1 carat.</p>
+<p>We fit a model for the log of the price (price grows roughly
+exponentially with size, and the log makes the relation linear) using
+only the quality variables. The coefficients are the differences with
+respect to the worst level (Fair, J, I1).</p>
+<div class="sourceCode" id="cb11"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb11-1"><a href="#cb11-1" tabindex="-1"></a>diamonds_f <span class="ot">&lt;-</span> diamonds <span class="sc">|&gt;</span></span>
+<span id="cb11-2"><a href="#cb11-2" tabindex="-1"></a>  <span class="fu">mutate</span>(</span>
+<span id="cb11-3"><a href="#cb11-3" tabindex="-1"></a>    <span class="at">cut =</span> <span class="fu">relevel</span>(<span class="fu">factor</span>(cut, <span class="at">ordered =</span> <span class="cn">FALSE</span>), <span class="st">&quot;Fair&quot;</span>),</span>
+<span id="cb11-4"><a href="#cb11-4" tabindex="-1"></a>    <span class="at">color =</span> <span class="fu">relevel</span>(<span class="fu">factor</span>(color, <span class="at">ordered =</span> <span class="cn">FALSE</span>), <span class="st">&quot;J&quot;</span>),</span>
+<span id="cb11-5"><a href="#cb11-5" tabindex="-1"></a>    <span class="at">clarity =</span> <span class="fu">relevel</span>(<span class="fu">factor</span>(clarity, <span class="at">ordered =</span> <span class="cn">FALSE</span>), <span class="st">&quot;I1&quot;</span>)</span>
+<span id="cb11-6"><a href="#cb11-6" tabindex="-1"></a>  )</span>
+<span id="cb11-7"><a href="#cb11-7" tabindex="-1"></a></span>
+<span id="cb11-8"><a href="#cb11-8" tabindex="-1"></a>model_quality <span class="ot">&lt;-</span> <span class="fu">lm</span>(<span class="fu">log</span>(price) <span class="sc">~</span> cut <span class="sc">+</span> color <span class="sc">+</span> clarity, <span class="at">data =</span> diamonds_f)</span>
+<span id="cb11-9"><a href="#cb11-9" tabindex="-1"></a><span class="fu">round</span>(<span class="fu">coef</span>(model_quality), <span class="dv">2</span>)</span></code></pre></div>
+<pre><code>##  (Intercept)      cutGood cutVery Good   cutPremium     cutIdeal       colorD 
+##         8.41        -0.16        -0.16        -0.06        -0.26        -0.52 
+##       colorE       colorF       colorG       colorH       colorI   claritySI2 
+##        -0.53        -0.33        -0.26        -0.20        -0.09         0.23 
+##   claritySI1   clarityVS2   clarityVS1  clarityVVS2  clarityVVS1    clarityIF 
+##        -0.08        -0.15        -0.22        -0.36        -0.58        -0.51</code></pre>
+<div class="sourceCode" id="cb13"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb13-1"><a href="#cb13-1" tabindex="-1"></a><span class="fu">summary</span>(model_quality)<span class="sc">$</span>r.squared</span></code></pre></div>
+<pre><code>## [1] 0.08483368</code></pre>
+<p>Without <code>carat</code> the model reproduces the paradox: the
+coefficients of the best cut (Ideal, -0.26) and of the best colors (D
+and E, about -0.5) are negative, meaning cheaper than the worst level.
+Also, the model explains only 8% of the variability of the price. Now we
+add <code>carat</code>, also on log scale:</p>
+<div class="sourceCode" id="cb15"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb15-1"><a href="#cb15-1" tabindex="-1"></a>model_carat <span class="ot">&lt;-</span> <span class="fu">lm</span>(<span class="fu">log</span>(price) <span class="sc">~</span> <span class="fu">log</span>(carat) <span class="sc">+</span> cut <span class="sc">+</span> color <span class="sc">+</span> clarity, <span class="at">data =</span> diamonds_f)</span>
+<span id="cb15-2"><a href="#cb15-2" tabindex="-1"></a><span class="fu">round</span>(<span class="fu">coef</span>(model_carat), <span class="dv">2</span>)</span></code></pre></div>
+<pre><code>##  (Intercept)   log(carat)      cutGood cutVery Good   cutPremium     cutIdeal 
+##         7.35         1.88         0.08         0.12         0.14         0.16 
+##       colorD       colorE       colorF       colorG       colorH       colorI 
+##         0.51         0.46         0.42         0.35         0.26         0.14 
+##   claritySI2   claritySI1   clarityVS2   clarityVS1  clarityVVS2  clarityVVS1 
+##         0.43         0.59         0.74         0.81         0.95         1.02 
+##    clarityIF 
+##         1.11</code></pre>
+<div class="sourceCode" id="cb17"><pre class="sourceCode r"><code class="sourceCode r"><span id="cb17-1"><a href="#cb17-1" tabindex="-1"></a><span class="fu">summary</span>(model_carat)<span class="sc">$</span>r.squared</span></code></pre></div>
+<pre><code>## [1] 0.9826161</code></pre>
+<p>Once the weight is taken into account the paradox disappears, and the
+model explains 98% of the variability. All the quality coefficients now
+have the expected sign and grow with quality: Ideal is about 17% more
+expensive than Fair (<code>exp(0.16)</code>) with the same carat, color
+D is about 67% more expensive than J (<code>exp(0.51)</code>) and
+clarity IF about three times more expensive than I1
+(<code>exp(1.11)</code>). The coefficient of <code>log(carat)</code> is
+1.88: a 1% heavier diamond is about 1.9% more expensive. So, at equal
+weight, better quality means higher price. Low quality diamonds looked
+more expensive only because they are bigger.</p>
+</div>
 </div>
 
 
