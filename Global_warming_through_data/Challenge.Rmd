@@ -502,3 +502,75 @@ Create a new folder on your GitHub repo and add:
 
 1. an R markdown document and its rendering in HTML including the code and an explanation on how the artwork has been generated;
 2. the image (PNG or JPEG) of the artwork
+
+## Our solution
+
+For the creative challenge we create **The ridgeline of warming**: a stack of distributions, one for each year from 1900 to today.
+
+Each ridge shows how the twelve monthly anomalies of a year are spread. The ridges move to the right over time and the colors move from purple to yellow, so the warming can be seen without any axis for the trend.
+
+### 1. Data
+
+We reuse the `temp` table built above and we keep the years from 1900 onwards, to keep the picture readable.
+
+```{r}
+temp_ridges <- temp |>
+  filter(Year >= 1900)
+```
+
+### 2. The ridgeline
+
+```{r, fig.width = 8, fig.height = 10, dev = "png"}
+library(ggridges)
+
+art <- ggplot(temp_ridges, aes(x = anomaly, y = as.factor(Year), fill = after_stat(x))) +
+  geom_density_ridges_gradient(
+    scale = 2.5,
+    rel_min_height = 0.01,
+    color = "#111111",
+    linewidth = 0.3
+  ) +
+  scale_fill_viridis_c(option = "plasma", name = "Anomaly (°C)") +
+  scale_y_discrete(breaks = seq(1900, 2020, by = 10)) +
+  labs(
+    title = "THE PLANETARY TEMPERATURE TREND",
+    subtitle = "Distribution of the monthly anomalies for each year (1900-today)",
+    x = "Temperature anomaly (°C)",
+    y = NULL,
+    caption = "NASA GISTEMP v4 | Baseline: 1951-1980"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.background = element_rect(fill = "#0f111a", color = NA),
+    panel.background = element_rect(fill = "#0f111a", color = NA),
+    text = element_text(color = "white"),
+    axis.text = element_text(color = "gray80"),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray70"),
+    legend.position = "right"
+  )
+
+art
+
+ggsave("overflow.png", art, width = 8, height = 10, dpi = 300)
+```
+
+### What we did, step by step
+
+1. We took the monthly anomalies from 1900 to today (each year has up to 12 values).
+2. For each year we estimated the distribution of its monthly anomalies with `geom_density_ridges_gradient()`.
+3. We stacked the years from the bottom (1900) to the top (today), so each ridge is one year.
+4. We colored each ridge along the horizontal axis with the `plasma` palette: the color depends on the anomaly, not on the year.
+5. We used a dark background and no grid, so the shapes stand out, and we labeled one year every ten.
+
+### How the data are mapped
+
+| Visual property | Variable |
+|---|---|
+| Vertical position of a ridge | `Year` |
+| Horizontal position | monthly anomaly |
+| Width and height of a ridge | how the 12 monthly anomalies of the year are spread |
+| Color | monthly anomaly (purple = cold, yellow = hot) |
+
+The ridges move steadily to the right: the monthly anomalies of 1909 are all between -0.72 and -0.32 °C (mean -0.48), the ones of 2000 are between 0.25 and 0.56 °C (mean 0.39) and the ones of 2024 between 1.16 and 1.43 °C (mean 1.28). The whole range of the data goes from -0.81 °C to 1.55 °C. A caveat: each ridge is estimated from at most 12 values, so its shape is only indicative, and the current year is incomplete.
