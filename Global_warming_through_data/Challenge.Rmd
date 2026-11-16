@@ -409,56 +409,71 @@ Create a new folder on your GitHub repo and add:
 
 ## Our solution
 
-For the creative challenge we create **The thermometers of warming**: a row of fifteen thermometers, one for each decade from the 1880s to the 2020s. How high the mercury goes, and the color of the mercury and of the bulb, both tell us the mean anomaly of that decade: reading from left to right, we watch the mercury climb.
+For the creative challenge we create **The waves of warming**: a stack of waves, one for each year from 1900 to today.
 
-### 1. The thermometers
+We chose waves as a metaphor for the warming of the seas. Most of the extra heat trapped by greenhouse gases ends up in the oceans, and a sea is something we picture as waves: rows of them, one behind the other, all moving in the same direction. Here every wave is one year, and the whole set slides from cold blue on the left to hot red on the right. A caveat on the metaphor: the dataset (NASA GISTEMP) is the global land-ocean temperature index, so it is not a measure of the sea alone, and the waves are an image and not a map of the oceans.
 
-We already have the mean anomaly of each decade in the `decades` table, so the only thing left to do is to turn it into a height. The coldest decade gets a level of 0.4 and the hottest one 3.2, on a tube that is 3.6 high. Then we draw each thermometer with a few thick lines with round ends, which is what gives it soft edges.
+### 1. Data
 
-```{r, fig.width = 9, fig.height = 4.5, dev = "png"}
-thermo <- decades |>
-  mutate(
-    position = row_number(),
-    level = scales::rescale(mean_anomaly, to = c(0.4, 3.2))
+We reuse the `temp` table built above and we keep the years from 1900 onwards, to keep the picture readable.
+
+```{r}
+temp_ridges <- temp |>
+  filter(Year >= 1900)
+```
+
+### 2. The waves
+
+```{r, fig.width = 10, fig.height = 7.5, dev = "png"}
+library(ggridges)
+
+art <- ggplot(temp_ridges, aes(x = anomaly, y = as.factor(Year), fill = after_stat(x))) +
+  geom_density_ridges_gradient(
+    scale = 2.5,
+    rel_min_height = 0.01,
+    color = "#111111",
+    linewidth = 0.3
+  ) +
+  scale_fill_gradient2(
+    low = "#2166AC",
+    mid = "#F7F7F7",
+    high = "#B2182B",
+    midpoint = 0,
+    name = "Anomaly (°C)"
+  ) +
+  scale_y_discrete(breaks = seq(1900, 2020, by = 10)) +
+  labs(
+    title = "THE WAVES OF WARMING",
+    subtitle = "Distribution of the monthly anomalies for each year (1900-today)",
+    x = "Temperature anomaly (°C)",
+    y = NULL,
+    caption = "NASA GISTEMP v4 | Baseline: 1951-1980"
+  ) +
+  theme_minimal() +
+  theme(
+    axis.text = element_text(color = "gray40"),
+    panel.grid = element_blank(),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray30"),
+    legend.position = "right"
   )
 
-thermo_art <- ggplot(thermo) +
-  geom_segment(
-    aes(x = position, xend = position, y = 0, yend = 3.6),
-    linewidth = 7.4, lineend = "round", color = "grey70"
-  ) +
-  geom_segment(
-    aes(x = position, xend = position, y = 0, yend = 3.6),
-    linewidth = 6.5, lineend = "round", color = "grey93"
-  ) +
-  geom_segment(
-    aes(x = position, xend = position, y = 0, yend = level, color = mean_anomaly),
-    linewidth = 3.5, lineend = "round"
-  ) +
-  geom_point(aes(x = position, y = -0.1), size = 10.5, color = "grey70") +
-  geom_point(aes(x = position, y = -0.1, color = mean_anomaly), size = 9.5) +
-  geom_text(
-    aes(x = position, y = -0.65, label = paste0(decade, "s")),
-    size = 3, color = "grey35"
-  ) +
-  scale_color_gradient2(
-    low = "#2166AC", mid = "#F7F7F7", high = "#B2182B",
-    midpoint = 0, guide = "none"
-  ) +
-  coord_equal() +
-  theme_void() +
-  theme(plot.background = element_rect(fill = "#fff", color = NA))
+art
 
-thermo_art
-
-ggsave("thermometers.png", thermo_art, width = 9, height = 4.5, dpi = 300)
+ggsave("waves.png", art, width = 10, height = 7.5, dpi = 300)
 ```
+
+### How the waves are made
+
+Each wave is one year. We take its twelve monthly anomalies, which are the differences from the 1951-1980 average, and we estimate their distribution with `geom_density_ridges_gradient()` from the `ggridges` package. The function puts a small bell on each of the twelve values and adds the bells up: where several months have similar anomalies the curve rises, and that is what makes the wave. The order of the months does not matter, January and July end up in the same bump if their anomalies are close.
+
+We then stack the waves from the bottom (1900) to the top (today). The horizontal position of a wave is the anomaly in °C, and its color is the anomaly too, with the same blue-white-red palette of the previous plots: the color depends on where we are along the horizontal axis, not on the year. The waves overlap (`scale = 2.5`) like rows of waves, `rel_min_height` cuts the flat tails, and we remove the grid and label one year every ten.
 
 | Visual property | Variable |
 |---|---|
-| Horizontal position of a thermometer | decade |
-| Height of the mercury | mean anomaly of the decade |
-| Color of the mercury and of the bulb | mean anomaly of the decade (blue = below the baseline, red = above) |
-| Tube, bulb outline and labels | decoration, not data |
+| Vertical position of a wave | `Year` (1900 at the bottom) |
+| Horizontal position along a wave | monthly anomaly (°C) |
+| Shape of a wave | distribution of the twelve monthly anomalies of that year |
+| Color | anomaly (blue = below the baseline, red = above) |
 
-The mercury stays low until the 1970s: the decades from 1880 to 1970 are all between -0.33 and 0.04 °C. After that it rises at every step, from 0.25 °C in the 1980s to 0.59 in the 2000s and 1.09 °C in the 2020s, and the color goes from pale blue to dark red. Two caveats. The 2020s only contain the years up to 2026. And the mercury does not start from zero, because the scale is stretched between the coldest and the hottest decade: the first thermometers look emptier than they really are compared with the baseline, so the heights should be read as a ranking and not as a measure.
+The waves move steadily to the right: the monthly anomalies of 1909 are all between -0.72 and -0.32 °C (mean -0.48), the ones of 2000 are between 0.25 and 0.56 °C (mean 0.39) and the ones of 2024 between 1.16 and 1.43 °C (mean 1.28). The whole range of the data goes from -0.81 °C to 1.55 °C. What carries the information is the position of a wave, which follows the annual mean, and its width, which shows how much the months of that year differ. The small bumps inside a wave are mostly chance: each wave is estimated from at most twelve values, so its fine shape is only indicative. The current year is also incomplete.
