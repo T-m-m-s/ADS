@@ -739,7 +739,7 @@ tree_art <- ggplot() +
   theme_minimal() +
   theme(
     panel.grid = element_blank(),
-    plot.background = element_rect(fill = "#FBF4E8", color = NA),
+    plot.background = element_rect(fill = "#fff", color = NA),
     plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
     plot.subtitle = element_text(size = 9, hjust = 0.5, color = "gray30"),
     axis.text = element_text(color = "gray35"),
