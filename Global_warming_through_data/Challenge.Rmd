@@ -568,3 +568,168 @@ ggsave("overflow.png", art, width = 10, height = 7.5, dpi = 300)
 5. We removed the grid, so the shapes stand out, and we labeled one year every ten.
 
 The ridges move steadily to the right: the monthly anomalies of 1909 are all between -0.72 and -0.32 °C (mean -0.48), the ones of 2000 are between 0.25 and 0.56 °C (mean 0.39) and the ones of 2024 between 1.16 and 1.43 °C (mean 1.28). The whole range of the data goes from -0.81 °C to 1.55 °C. A caveat: each ridge is estimated from at most 12 values, so its shape is only indicative, and the current year is incomplete.
+
+
+
+
+### 5. A fourth artwork: the climate tree
+
+The last artwork is a tree. The crown is made of leaves packed one next to the other without overlapping, and the years run along the horizontal axis: the leaves on the left belong to the oldest years and are blue, the ones on the right belong to the most recent years and are red.
+
+```{r, fig.width = 8, fig.height = 7, dev = "png"}
+set.seed(1880)
+
+# 1. The crown: leaves on a hexagonal grid, inside an ellipse.
+# The horizontal position gives the year, the vertical position gives the month
+d <- 0.058
+crown_x <- 0; crown_y <- 1.05; crown_a <- 1; crown_b <- 0.85
+
+grid <- expand_grid(row = 0:70, col = -30:30) |>
+  mutate(
+    x = col * d + (row %% 2) * d / 2,
+    y = (crown_y - crown_b) + row * d * sqrt(3) / 2,
+    ellipse = ((x - crown_x) / crown_a)^2 + ((y - crown_y) / crown_b)^2
+  ) |>
+  filter(abs(x) <= crown_a, y <= crown_y + crown_b)
+
+# The leaves of the crown, plus a few leaves that fall or fly outside of it,
+# so that every year and every month has some leaves
+leaves <- bind_rows(
+  grid |> filter(ellipse <= 0.97) |> mutate(falling = FALSE),
+  grid |> filter(ellipse > 1.08, runif(n()) < 0.4) |> mutate(falling = TRUE)
+) |>
+  mutate(
+    id = row_number(),
+    angle = if_else(
+      falling,
+      runif(n(), -pi, pi),
+      atan2(y - 0.65, x - crown_x) + runif(n(), -0.35, 0.35)
+    ),
+    year = round(scales::rescale(x, to = c(1880, max(temp$Year)), from = c(-1, 1))),
+    year = pmin(pmax(year, 1880), max(temp$Year)),
+    month_number = pmin(12, floor((y - (crown_y - crown_b)) / (2 * crown_b / 12)) + 1)
+  ) |>
+  left_join(
+    temp |> mutate(month_number = as.integer(month)) |> select(Year, month_number, anomaly),
+    by = c("year" = "Year", "month_number")
+  ) |>
+  drop_na(anomaly)
+
+# 2. The shape of a leaf, rotated away from the trunk
+leaf_length <- d * 0.95
+t <- seq(0, 1, length.out = 14)
+half_width <- 0.5 * sin(pi * t^0.75)^1.1
+
+leaf_polygons <- leaves |>
+  select(id, x, y, angle, anomaly) |>
+  rowwise() |>
+  reframe(
+    id = id,
+    anomaly = anomaly,
+    u = c(t, rev(t)) * leaf_length - leaf_length / 2,
+    v = c(half_width, -rev(half_width)) * leaf_length,
+    px = x + u * cos(angle) - v * sin(angle),
+    py = y + u * sin(angle) + v * cos(angle)
+  )
+
+# 3. Trunk and branches
+branches <- list()
+grow <- function(x, y, angle, len, width, depth) {
+  xend <- x + len * sin(angle)
+  yend <- y + len * cos(angle)
+  if (((xend - crown_x) / crown_a)^2 + ((yend - crown_y) / crown_b)^2 > 0.8) return(invisible())
+  branches[[length(branches) + 1]] <<- tibble(x = x, y = y, xend = xend, yend = yend, width = width)
+  if (depth > 0) {
+    for (s in c(-1, 1)) grow(xend, yend, angle + s * runif(1, 0.35, 0.7), len * 0.74, width * 0.66, depth - 1)
+  }
+}
+grow(0, 0.55, 0, 0.30, 4, 4)
+grow(0, 0.50, -0.9, 0.30, 3.5, 3)
+grow(0, 0.50, 0.9, 0.30, 3.5, 3)
+branches <- bind_rows(branches)
+
+trunk <- tibble(
+  x = c(-0.09, -0.04, -0.025, 0.025, 0.04, 0.09),
+  y = c(0, 0.22, 0.58, 0.58, 0.22, 0)
+)
+
+# 4. The axes: years at the bottom, months on the left (January at the bottom)
+month_ticks <- tibble(month_number = 1:12, label = month.abb) |>
+  mutate(y = (crown_y - crown_b) + (month_number - 0.5) * (2 * crown_b / 12))
+
+year_ticks <- tibble(year = c(1880, 1920, 1960, 2000, max(temp$Year))) |>
+  mutate(x = scales::rescale(year, to = c(-1, 1), from = c(1880, max(temp$Year))))
+
+tree_art <- ggplot() +
+  geom_polygon(
+    data = leaf_polygons,
+    aes(x = px, y = py, group = id, fill = anomaly),
+    color = "grey45", linewidth = 0.15
+  ) +
+  geom_polygon(data = trunk, aes(x = x, y = y), fill = "#7B5338") +
+  geom_segment(
+    data = branches,
+    aes(x = x, y = y, xend = xend, yend = yend, linewidth = width),
+    color = "#7B5338", lineend = "round"
+  ) +
+  geom_segment(aes(x = -1, xend = 1, y = -0.1, yend = -0.1), color = "grey40", linewidth = 0.3) +
+  geom_segment(data = year_ticks, aes(x = x, xend = x, y = -0.1, yend = -0.13), color = "grey40") +
+  geom_text(data = year_ticks, aes(x = x, y = -0.2, label = year), color = "grey35", size = 3) +
+  geom_segment(
+    aes(x = -1.12, xend = -1.12, y = crown_y - crown_b, yend = crown_y + crown_b),
+    color = "grey40", linewidth = 0.3
+  ) +
+  geom_segment(
+    data = month_ticks,
+    aes(x = -1.12, xend = -1.09, y = y, yend = y),
+    color = "grey40"
+  ) +
+  geom_text(
+    data = month_ticks,
+    aes(x = -1.15, y = y, label = label),
+    hjust = 1, color = "grey35", size = 3
+  ) +
+  scale_fill_gradient2(
+    low = "#2166AC", mid = "#F7F7F7", high = "#B2182B",
+    midpoint = 0, guide = "none"
+  ) +
+  scale_linewidth_identity() +
+  coord_equal() +
+  labs(
+    title = "THE CLIMATE TREE",
+    subtitle = "Each leaf is a month: years from 1880 (left) to today (right), January at the bottom and December at the top",
+    caption = "NASA GISTEMP v4 | Baseline: 1951-1980"
+  ) +
+  theme_void() +
+  theme(
+    plot.background = element_rect(fill = "#FBF4E8", color = NA),
+    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
+    plot.subtitle = element_text(size = 9, hjust = 0.5, color = "gray30"),
+    plot.caption = element_text(color = "gray40", size = 8),
+    plot.margin = margin(15, 15, 15, 15)
+  )
+
+tree_art
+
+ggsave("climate_tree.png", tree_art, width = 8, height = 7, dpi = 300)
+
+nrow(leaves)
+```
+
+Step by step:
+
+1. We placed the leaves on a hexagonal grid. The ones inside an ellipse are the crown. Every leaf is shorter than the distance between two neighbors, so the leaves never overlap.
+2. In the corners of the plot, where the crown does not reach, we kept about 40% of the grid positions and we turned the leaves in random directions: they are the leaves that fall or fly away. They are needed to read the plot, because without them some years and months (for example January 1880) would have no leaf.
+3. The horizontal position of a leaf gives its year, from 1880 (left) to the last year in the data (right).
+4. The vertical position gives the month: we cut the crown in 12 horizontal bands, from January at the bottom to December at the top. The color of a leaf is the anomaly of that month in that year, with the same blue-white-red palette of the previous plots. The leaves with no data (the last months of the current year) are removed.
+5. We drew each leaf as a pointed shape and turned it away from the trunk.
+6. We drew the trunk and the branches with a small recursive function, on top of the leaves, and we added two axes: the years at the bottom and the months on the left.
+
+| Visual property | Variable |
+|---|---|
+| Horizontal position of a leaf | `Year` |
+| Vertical position of a leaf | month (January at the bottom, December at the top) |
+| Color of a leaf | anomaly of that month and year (blue = below the baseline, red = above) |
+| Trunk, branches, size and shape of the leaves | decoration, not data |
+
+The tree goes from blue on the left to red on the right, and the leaves in the middle, from the 1940s to the 1970s, are the palest because their anomalies are close to zero. The color changes gradually from left to right, and since the height of a leaf is its month, we can also check whether the warming depends on the season. A caveat: each leaf covers about four years, because there are fewer leaves in a row than years, so a leaf shows one year of the group and not an average. The seed `set.seed(1880)` only fixes the small random rotation of the leaves and of the branches.
