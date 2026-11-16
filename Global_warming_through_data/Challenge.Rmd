@@ -400,102 +400,6 @@ Your artwork should satisfy three requirements:
 
 You may remove conventional statistical elements such as axes, titles, legends, and labels, but you must document how the data are mapped to the artwork.
 
-#### Representation
-
-Each year is a ray around a circle, going clockwise from 1880. Ray length and color encode the anomaly, and the sun ends up spiky and red on the last rays.
-
-```{r sun}
-sun <- annual |>
-  mutate(
-    angle = 2 * pi * (Year - min(Year)) / n(),
-    len = 1 + scales::rescale(mean_anomaly, to = c(0, 1.2)),
-    x = cos(angle), y = sin(angle),
-    xend = len * cos(angle), yend = len * sin(angle)
-  )
-
-ggplot(sun) +
-  geom_segment(
-    aes(x = x, y = y, xend = xend, yend = yend, color = mean_anomaly),
-    linewidth = 1.1, lineend = "round"
-  ) +
-  coord_equal() +
-  scale_color_gradient2(
-    low = "#2166AC", mid = "#F7F7F7", high = "#B2182B", midpoint = 0,
-    guide = "none"
-  ) +
-  theme_void() +
-  theme(plot.background = element_rect(fill = "white", color = NA))
-```
-
-Mapping: angle = year, ray length and color = annual mean anomaly.
-
-#### Sunrise
-
-Same idea as the sun, opened into a half circle: the years run left to right along the horizon, and each ray ends in a dot. The last rays rise red on the right.
-
-```{r sunrise}
-dawn <- annual |>
-  mutate(
-    angle = pi * (1 - (Year - min(Year)) / (n() - 1)),
-    len = 1 + scales::rescale(mean_anomaly, to = c(0, 1.2)),
-    x = cos(angle), y = sin(angle),
-    xend = len * cos(angle), yend = len * sin(angle)
-  )
-
-ggplot(dawn) +
-  geom_segment(
-    aes(x = x, y = y, xend = xend, yend = yend, color = mean_anomaly),
-    linewidth = 0.8, lineend = "round"
-  ) +
-  geom_point(
-    aes(x = xend, y = yend, color = mean_anomaly, size = len)
-  ) +
-  geom_hline(yintercept = 0, color = "grey80", linewidth = 0.3) +
-  coord_equal() +
-  scale_size(range = c(0.4, 2.2), guide = "none") +
-  scale_color_gradient2(
-    low = "#2166AC", mid = "#CFCFCF", high = "#B2182B", midpoint = 0,
-    guide = "none"
-  ) +
-  theme_void() +
-  theme(plot.background = element_rect(fill = "white", color = NA))
-```
-
-Mapping: angle = year (left = 1880, right = latest), ray length, dot size and color = annual mean anomaly.
-
-#### Wobbling rings
-
-Each year is a circle. Its radius grows with the year, and its outline wobbles with the twelve monthly anomalies, interpolated into a smooth closed curve. Old rings are calm and blue, recent rings are restless and red.
-
-```{r wobbling-rings}
-wobble <- temp |>
-  group_by(Year) |>
-  filter(n() == 12) |>
-  arrange(month) |>
-  reframe(
-    m = seq(1, 13, length.out = 240),
-    a = spline(1:13, c(anomaly, anomaly[1]), xout = m, method = "periodic")$y,
-    year_mean = mean(anomaly)
-  ) |>
-  mutate(
-    r = 2 + (Year - min(Year)) * 0.12 + 2 * a,
-    theta = 2 * pi * (m - 1) / 12,
-    x = r * cos(theta), y = r * sin(theta)
-  )
-
-ggplot(wobble, aes(x = x, y = y, group = Year, color = year_mean)) +
-  geom_path(linewidth = 0.35) +
-  coord_equal() +
-  scale_color_gradient2(
-    low = "#2166AC", mid = "#CFCFCF", high = "#B2182B", midpoint = 0,
-    guide = "none"
-  ) +
-  theme_void() +
-  theme(plot.background = element_rect(fill = "white", color = NA))
-```
-
-Mapping: ring radius = year, wobble amplitude = monthly anomaly, angle = month, color = annual mean anomaly.
-
 ### Delivery
 
 Create a new folder on your GitHub repo and add:
@@ -505,257 +409,56 @@ Create a new folder on your GitHub repo and add:
 
 ## Our solution
 
-For the creative challenge we create **The ridgeline of warming**: a stack of distributions, one for each year from 1900 to today.
+For the creative challenge we create **The thermometers of warming**: a row of fifteen thermometers, one for each decade from the 1880s to the 2020s. How high the mercury goes, and the color of the mercury and of the bulb, both tell us the mean anomaly of that decade: reading from left to right, we watch the mercury climb.
 
-Each ridge shows how the twelve monthly anomalies of a year are spread. The ridges move to the right over time and the colors move from blue to red, so the warming can be seen without any axis for the trend.
+### 1. The thermometers
 
-### 1. Data
+We already have the mean anomaly of each decade in the `decades` table, so the only thing left to do is to turn it into a height. The coldest decade gets a level of 0.4 and the hottest one 3.2, on a tube that is 3.6 high. Then we draw each thermometer with a few thick lines with round ends, which is what gives it soft edges.
 
-We reuse the `temp` table built above and we keep the years from 1900 onwards, to keep the picture readable.
-
-```{r}
-temp_ridges <- temp |>
-  filter(Year >= 1900)
-```
-
-### 2. The ridgeline
-
-```{r, fig.width = 10, fig.height = 7.5, dev = "png"}
-library(ggridges)
-
-art <- ggplot(temp_ridges, aes(x = anomaly, y = as.factor(Year), fill = after_stat(x))) +
-  geom_density_ridges_gradient(
-    scale = 2.5,
-    rel_min_height = 0.01,
-    color = "#111111",
-    linewidth = 0.3
-  ) +
-  scale_fill_gradient2(
-    low = "#2166AC",
-    mid = "#F7F7F7",
-    high = "#B2182B",
-    midpoint = 0,
-    name = "Anomaly (°C)"
-  ) +
-  scale_y_discrete(breaks = seq(1900, 2020, by = 10)) +
-  labs(
-    title = "THE PLANETARY TEMPERATURE TREND",
-    subtitle = "Distribution of the monthly anomalies for each year (1900-today)",
-    x = "Temperature anomaly (°C)",
-    y = NULL,
-    caption = "NASA GISTEMP v4 | Baseline: 1951-1980"
-  ) +
-  theme_minimal() +
-  theme(
-    axis.text = element_text(color = "gray40"),
-    panel.grid = element_blank(),
-    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-    plot.subtitle = element_text(size = 10, hjust = 0.5, color = "gray30"),
-    legend.position = "right"
+```{r, fig.width = 9, fig.height = 4.5, dev = "png"}
+thermo <- decades |>
+  mutate(
+    position = row_number(),
+    level = scales::rescale(mean_anomaly, to = c(0.4, 3.2))
   )
 
-art
-
-ggsave("overflow.png", art, width = 10, height = 7.5, dpi = 300)
-```
-
-### What we did, step by step
-
-1. We took the monthly anomalies from 1900 to today (each year has up to 12 values).
-2. For each year we estimated the distribution of its monthly anomalies with `geom_density_ridges_gradient()`.
-3. We stacked the years from the bottom (1900) to the top (today), so each ridge is one year.
-4. We colored each ridge along the horizontal axis with the same blue-white-red palette used in the previous plots: the color depends on the anomaly, not on the year.
-5. We removed the grid, so the shapes stand out, and we labeled one year every ten.
-
-The ridges move steadily to the right: the monthly anomalies of 1909 are all between -0.72 and -0.32 °C (mean -0.48), the ones of 2000 are between 0.25 and 0.56 °C (mean 0.39) and the ones of 2024 between 1.16 and 1.43 °C (mean 1.28). The whole range of the data goes from -0.81 °C to 1.55 °C. A caveat: each ridge is estimated from at most 12 values, so its shape is only indicative, and the current year is incomplete.
-
-
-
-
-### 3. A second artwork: the climate tree
-
-The last artwork is a tree. Its crown is made of leaves placed one next to the other without overlapping. The horizontal position of a leaf is a year (1880 on the left, today on the right), its height is a month (January at the bottom, December at the top) and its color is the anomaly of that month: blue leaves on the left, red leaves on the right.
-
-We build it in five steps.
-
-#### Step 1: the positions of the leaves
-
-We place the points on a hexagonal grid, so that every leaf has the same distance from its neighbors. The points inside an ellipse form the crown. In the corners, where the crown does not reach, we keep only 40% of the points: they are the leaves that fall or fly away, and they are needed because otherwise some months of some years (for example January 1880) would have no leaf.
-
-```{r}
-set.seed(1780)
-
-size <- 0.06     # distance between two leaves
-base <- 0.2      # bottom of the crown
-height <- 1.7    # height of the crown
-
-grid <- expand_grid(row = 0:70, col = -30:30) |>
-  mutate(
-    x = col * size + (row %% 2) * size / 2,
-    y = base + row * size * sqrt(3) / 2,
-    inside = x^2 + ((y - base - height / 2) / (height / 2))^2
-  ) |>
-  filter(abs(x) <= 1, y <= base + height)
-
-leaves <- bind_rows(
-  grid |> filter(inside <= 0.97) |> mutate(falling = FALSE),
-  grid |> filter(inside > 1.08, runif(n()) < 0.4) |> mutate(falling = TRUE)
-) |>
-  mutate(
-    id = row_number(),
-    angle = if_else(
-      falling,
-      runif(n(), -pi, pi),
-      atan2(y - 0.65, x) + runif(n(), -0.35, 0.35)
-    )
-  )
-
-nrow(leaves)
-```
-
-The leaves of the crown point away from the trunk, the falling ones point in a random direction.
-
-#### Step 2: year, month and color
-
-We convert the horizontal position into a year and the height into a month, and then we take the anomaly of that month from the `temp` table. The leaves with no data (the last months of the current year) are removed.
-
-```{r}
-last_year <- max(temp$Year)
-
-leaves <- leaves |>
-  mutate(
-    year = round(scales::rescale(x, to = c(1880, last_year), from = c(-1, 1))),
-    month = pmin(12, floor((y - base) / (height / 12)) + 1)
-  ) |>
-  left_join(
-    temp |> mutate(month = as.integer(month)) |> select(year = Year, month, anomaly),
-    by = c("year", "month")
-  ) |>
-  drop_na(anomaly)
-
-head(leaves |> select(x, y, year, month, anomaly), n = 5)
-```
-
-#### Step 3: the shape of a leaf
-
-A leaf is a pointed shape with a length slightly shorter than the distance between two leaves, so the leaves never overlap. We draw it once and we copy it on every position, rotated by its angle.
-
-```{r}
-t <- seq(0, 1, length.out = 10)
-
-outline <- tibble(
-  u = c(t, rev(t)) - 0.5,
-  v = c(0.4 * sin(pi * t), -0.4 * sin(pi * rev(t)))
-)
-
-leaf_polygons <- leaves |>
-  cross_join(outline) |>
-  mutate(
-    px = x + 0.95 * size * (u * cos(angle) - v * sin(angle)),
-    py = y + 0.95 * size * (u * sin(angle) + v * cos(angle))
-  )
-```
-
-#### Step 4: trunk and branches
-
-The trunk is a polygon and the branches are a few segments, thicker near the trunk and thinner at the ends.
-
-```{r}
-trunk <- tibble(
-  x = c(-0.09, -0.04, -0.025, 0.025, 0.04, 0.09),
-  y = c(0, 0.22, 0.58, 0.58, 0.22, 0)
-)
-
-branches <- tribble(
-  ~x,    ~y,   ~xend, ~yend, ~width,
-  0,     0.55,  0,     1.30,  2.5,
-  0,     0.55, -0.35,  0.95,  2.5,
-  0,     0.55,  0.35,  0.95,  2.5,
-  0,     0.50, -0.55,  0.65,  1.8,
-  0,     0.50,  0.55,  0.65,  1.8,
-  0,     1.30, -0.20,  1.65,  1.1,
-  0,     1.30,  0.20,  1.65,  1.1,
-  -0.35, 0.95, -0.70,  1.25,  1.8,
-  -0.35, 0.95, -0.45,  1.50,  1.4,
-  -0.35, 0.95, -0.80,  0.90,  1.4,
-  0.35,  0.95,  0.70,  1.25,  1.8,
-  0.35,  0.95,  0.45,  1.50,  1.4,
-  0.35,  0.95,  0.80,  0.90,  1.4,
-  -0.70, 1.25, -0.95,  1.40,  0.8,
-  0.70,  1.25,  0.95,  1.40,  0.8
-)
-```
-
-This is the structure of the tree alone, without the leaves:
-
-```{r, fig.width = 5, fig.height = 4.4, dev = "png"}
-ggplot() +
-  geom_polygon(data = trunk, aes(x = x, y = y), fill = "#7B5338") +
+thermo_art <- ggplot(thermo) +
   geom_segment(
-    data = branches,
-    aes(x = x, y = y, xend = xend, yend = yend, linewidth = width),
-    color = "#7B5338", lineend = "round"
+    aes(x = position, xend = position, y = 0, yend = 3.6),
+    linewidth = 7.4, lineend = "round", color = "grey70"
   ) +
-  scale_linewidth_identity() +
-  coord_equal() +
-  theme_void() +
-  theme(plot.background = element_rect(fill = "#fff", color = NA))
-```
-
-#### Step 5: the plot
-
-We draw trunk and branches first and the leaves on top of them, so that no leaf (that is, no data) is hidden. The leaves use the same blue-white-red palette of the previous plots. The axes are the years (bottom) and the months (left): we replace the numbers of the horizontal and vertical positions with the corresponding labels.
-
-```{r, fig.width = 8, fig.height = 7, dev = "png"}
-years <- c(1880, 1920, 1960, 2000, last_year)
-years_x <- scales::rescale(years, to = c(-1, 1), from = c(1880, last_year))
-months_y <- base + (1:12 - 0.5) * height / 12
-
-tree_art <- ggplot() +
-  geom_polygon(data = trunk, aes(x = x, y = y), fill = "#7B5338") +
   geom_segment(
-    data = branches,
-    aes(x = x, y = y, xend = xend, yend = yend, linewidth = width),
-    color = "#7B5338", lineend = "round"
+    aes(x = position, xend = position, y = 0, yend = 3.6),
+    linewidth = 6.5, lineend = "round", color = "grey93"
   ) +
-  geom_polygon(
-    data = leaf_polygons,
-    aes(x = px, y = py, group = id, fill = anomaly),
-    color = "grey45", linewidth = 0.15
+  geom_segment(
+    aes(x = position, xend = position, y = 0, yend = level, color = mean_anomaly),
+    linewidth = 3.5, lineend = "round"
   ) +
-  scale_fill_gradient2(
+  geom_point(aes(x = position, y = -0.1), size = 10.5, color = "grey70") +
+  geom_point(aes(x = position, y = -0.1, color = mean_anomaly), size = 9.5) +
+  geom_text(
+    aes(x = position, y = -0.65, label = paste0(decade, "s")),
+    size = 3, color = "grey35"
+  ) +
+  scale_color_gradient2(
     low = "#2166AC", mid = "#F7F7F7", high = "#B2182B",
     midpoint = 0, guide = "none"
   ) +
-  scale_linewidth_identity() +
-  scale_x_continuous(breaks = years_x, labels = years) +
-  scale_y_continuous(breaks = months_y, labels = month.abb) +
   coord_equal() +
-  labs(
-    title = "THE CLIMATE TREE",
-    subtitle = "Each leaf is a month: years from 1880 (left) to today (right), January at the bottom and December at the top",
-    x = NULL, y = NULL
-  ) +
-  theme_minimal() +
-  theme(
-    panel.grid = element_blank(),
-    plot.background = element_rect(fill = "#fff", color = NA),
-    plot.title = element_text(face = "bold", size = 14, hjust = 0.5),
-    plot.subtitle = element_text(size = 9, hjust = 0.5, color = "gray30"),
-    axis.text = element_text(color = "gray35"),
-    plot.caption = element_text(color = "gray40", size = 8)
-  )
+  theme_void() +
+  theme(plot.background = element_rect(fill = "#fff", color = NA))
 
-tree_art
+thermo_art
 
-ggsave("climate_tree.png", tree_art, width = 8, height = 7, dpi = 300)
+ggsave("thermometers.png", thermo_art, width = 9, height = 4.5, dpi = 300)
 ```
 
 | Visual property | Variable |
 |---|---|
-| Horizontal position of a leaf | `Year` |
-| Vertical position of a leaf | month (January at the bottom, December at the top) |
-| Color of a leaf | anomaly of that month and year (blue = below the baseline, red = above) |
-| Trunk, branches, shape and direction of the leaves | decoration, not data |
+| Horizontal position of a thermometer | decade |
+| Height of the mercury | mean anomaly of the decade |
+| Color of the mercury and of the bulb | mean anomaly of the decade (blue = below the baseline, red = above) |
+| Tube, bulb outline and labels | decoration, not data |
 
-The tree goes from blue on the left to red on the right, and the leaves in the middle, from the 1940s to the 1970s, are the palest because their anomalies are close to zero. Since the height of a leaf is its month, we can also check whether the warming depends on the season: the red on the right appears at every height. A caveat: each leaf covers about four years, because there are fewer leaves in a row than years, so a leaf shows one year of the group and not an average. The seed only fixes the small random rotation of the leaves and the choice of the falling leaves.
+The mercury stays low until the 1970s: the decades from 1880 to 1970 are all between -0.33 and 0.04 °C. After that it rises at every step, from 0.25 °C in the 1980s to 0.59 in the 2000s and 1.09 °C in the 2020s, and the color goes from pale blue to dark red. Two caveats. The 2020s only contain the years up to 2026. And the mercury does not start from zero, because the scale is stretched between the coldest and the hottest decade: the first thermometers look emptier than they really are compared with the baseline, so the heights should be read as a ranking and not as a measure.
