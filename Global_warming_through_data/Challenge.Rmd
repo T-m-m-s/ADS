@@ -400,6 +400,102 @@ Your artwork should satisfy three requirements:
 
 You may remove conventional statistical elements such as axes, titles, legends, and labels, but you must document how the data are mapped to the artwork.
 
+#### Representation
+
+Each year is a ray around a circle, going clockwise from 1880. Ray length and color encode the anomaly, and the sun ends up spiky and red on the last rays.
+
+```{r sun}
+sun <- annual |>
+  mutate(
+    angle = 2 * pi * (Year - min(Year)) / n(),
+    len = 1 + scales::rescale(mean_anomaly, to = c(0, 1.2)),
+    x = cos(angle), y = sin(angle),
+    xend = len * cos(angle), yend = len * sin(angle)
+  )
+
+ggplot(sun) +
+  geom_segment(
+    aes(x = x, y = y, xend = xend, yend = yend, color = mean_anomaly),
+    linewidth = 1.1, lineend = "round"
+  ) +
+  coord_equal() +
+  scale_color_gradient2(
+    low = "#2166AC", mid = "#F7F7F7", high = "#B2182B", midpoint = 0,
+    guide = "none"
+  ) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "white", color = NA))
+```
+
+Mapping: angle = year, ray length and color = annual mean anomaly.
+
+#### Sunrise
+
+Same idea as the sun, opened into a half circle: the years run left to right along the horizon, and each ray ends in a dot. The last rays rise red on the right.
+
+```{r sunrise}
+dawn <- annual |>
+  mutate(
+    angle = pi * (1 - (Year - min(Year)) / (n() - 1)),
+    len = 1 + scales::rescale(mean_anomaly, to = c(0, 1.2)),
+    x = cos(angle), y = sin(angle),
+    xend = len * cos(angle), yend = len * sin(angle)
+  )
+
+ggplot(dawn) +
+  geom_segment(
+    aes(x = x, y = y, xend = xend, yend = yend, color = mean_anomaly),
+    linewidth = 0.8, lineend = "round"
+  ) +
+  geom_point(
+    aes(x = xend, y = yend, color = mean_anomaly, size = len)
+  ) +
+  geom_hline(yintercept = 0, color = "grey80", linewidth = 0.3) +
+  coord_equal() +
+  scale_size(range = c(0.4, 2.2), guide = "none") +
+  scale_color_gradient2(
+    low = "#2166AC", mid = "#CFCFCF", high = "#B2182B", midpoint = 0,
+    guide = "none"
+  ) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "white", color = NA))
+```
+
+Mapping: angle = year (left = 1880, right = latest), ray length, dot size and color = annual mean anomaly.
+
+#### Wobbling rings
+
+Each year is a circle. Its radius grows with the year, and its outline wobbles with the twelve monthly anomalies, interpolated into a smooth closed curve. Old rings are calm and blue, recent rings are restless and red.
+
+```{r wobbling-rings}
+wobble <- temp |>
+  group_by(Year) |>
+  filter(n() == 12) |>
+  arrange(month) |>
+  reframe(
+    m = seq(1, 13, length.out = 240),
+    a = spline(1:13, c(anomaly, anomaly[1]), xout = m, method = "periodic")$y,
+    year_mean = mean(anomaly)
+  ) |>
+  mutate(
+    r = 2 + (Year - min(Year)) * 0.12 + 2 * a,
+    theta = 2 * pi * (m - 1) / 12,
+    x = r * cos(theta), y = r * sin(theta)
+  )
+
+ggplot(wobble, aes(x = x, y = y, group = Year, color = year_mean)) +
+  geom_path(linewidth = 0.35) +
+  coord_equal() +
+  scale_color_gradient2(
+    low = "#2166AC", mid = "#CFCFCF", high = "#B2182B", midpoint = 0,
+    guide = "none"
+  ) +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "white", color = NA))
+```
+
+Mapping: ring radius = year, wobble amplitude = monthly anomaly, angle = month, color = annual mean anomaly.
+
 ### Delivery
 
 Create a new folder on your GitHub repo and add:
