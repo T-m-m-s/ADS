@@ -583,7 +583,7 @@ We build it in five steps.
 We place the points on a hexagonal grid, so that every leaf has the same distance from its neighbors. The points inside an ellipse form the crown. In the corners, where the crown does not reach, we keep only 40% of the points: they are the leaves that fall or fly away, and they are needed because otherwise some months of some years (for example January 1880) would have no leaf.
 
 ```{r}
-set.seed(1880)
+set.seed(1780)
 
 size <- 0.06     # distance between two leaves
 base <- 0.2      # bottom of the crown
@@ -686,9 +686,25 @@ branches <- tribble(
 )
 ```
 
+This is the structure of the tree alone, without the leaves:
+
+```{r, fig.width = 5, fig.height = 4.4, dev = "png"}
+ggplot() +
+  geom_polygon(data = trunk, aes(x = x, y = y), fill = "#7B5338") +
+  geom_segment(
+    data = branches,
+    aes(x = x, y = y, xend = xend, yend = yend, linewidth = width),
+    color = "#7B5338", lineend = "round"
+  ) +
+  scale_linewidth_identity() +
+  coord_equal() +
+  theme_void() +
+  theme(plot.background = element_rect(fill = "#fff", color = NA))
+```
+
 #### Step 5: the plot
 
-We draw leaves, trunk and branches with the same blue-white-red palette of the previous plots. The axes are the years (bottom) and the months (left): we replace the numbers of the horizontal and vertical positions with the corresponding labels.
+We draw trunk and branches first and the leaves on top of them, so that no leaf (that is, no data) is hidden. The leaves use the same blue-white-red palette of the previous plots. The axes are the years (bottom) and the months (left): we replace the numbers of the horizontal and vertical positions with the corresponding labels.
 
 ```{r, fig.width = 8, fig.height = 7, dev = "png"}
 years <- c(1880, 1920, 1960, 2000, last_year)
@@ -696,16 +712,16 @@ years_x <- scales::rescale(years, to = c(-1, 1), from = c(1880, last_year))
 months_y <- base + (1:12 - 0.5) * height / 12
 
 tree_art <- ggplot() +
-  geom_polygon(
-    data = leaf_polygons,
-    aes(x = px, y = py, group = id, fill = anomaly),
-    color = "grey45", linewidth = 0.15
-  ) +
   geom_polygon(data = trunk, aes(x = x, y = y), fill = "#7B5338") +
   geom_segment(
     data = branches,
     aes(x = x, y = y, xend = xend, yend = yend, linewidth = width),
     color = "#7B5338", lineend = "round"
+  ) +
+  geom_polygon(
+    data = leaf_polygons,
+    aes(x = px, y = py, group = id, fill = anomaly),
+    color = "grey45", linewidth = 0.15
   ) +
   scale_fill_gradient2(
     low = "#2166AC", mid = "#F7F7F7", high = "#B2182B",
